@@ -3,8 +3,10 @@
  * CacheProperties.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -12,11 +14,11 @@ declare(strict_types = 1);
 namespace FireflyIII\Support;
 
 
-use Auth;
 use Cache;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Log;
 use Preferences as Prefs;
 
 /**
@@ -38,8 +40,8 @@ class CacheProperties
     public function __construct()
     {
         $this->properties = new Collection;
-        if (Auth::check()) {
-            $this->addProperty(Auth::user()->id);
+        if (auth()->check()) {
+            $this->addProperty(auth()->user()->id);
             $this->addProperty(Prefs::lastActivity());
         }
     }
@@ -94,6 +96,7 @@ class CacheProperties
      */
     private function md5()
     {
+        $this->md5 = '';
         foreach ($this->properties as $property) {
 
             if ($property instanceof Collection || $property instanceof EloquentCollection) {
@@ -107,10 +110,17 @@ class CacheProperties
             if (is_object($property)) {
                 $this->md5 .= $property->__toString();
             }
+            if (is_bool($property) && $property === false) {
+                $this->md5 .= 'false';
+            }
+            if (is_bool($property) && $property === true) {
+                $this->md5 .= 'true';
+            }
 
             $this->md5 .= json_encode($property);
         }
-
+        Log::debug(sprintf('Cache string is %s', $this->md5));
         $this->md5 = md5($this->md5);
+        Log::debug(sprintf('Cache MD5 is    %s', $this->md5));
     }
 }

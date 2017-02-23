@@ -3,8 +3,10 @@
  * Category.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -53,7 +55,6 @@ class Category
      */
     public function addTotal(string $add)
     {
-        $add         = strval(round($add, 2));
         $this->total = bcadd($this->total, $add);
     }
 
@@ -77,7 +78,7 @@ class Category
      */
     public function getTotal(): string
     {
-        return strval(round($this->total, 2));
+        return $this->total;
     }
 
 

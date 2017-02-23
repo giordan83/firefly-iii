@@ -3,8 +3,10 @@
  * UserRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -22,6 +24,7 @@ use Illuminate\Support\Collection;
  */
 interface UserRepositoryInterface
 {
+
     /**
      * Returns a collection of all users.
      *
@@ -40,9 +43,40 @@ interface UserRepositoryInterface
     public function attachRole(User $user, string $role): bool;
 
     /**
+     * @param User   $user
+     * @param string $password
+     *
+     * @return mixed
+     */
+    public function changePassword(User $user, string $password);
+
+    /**
      * Returns a count of all users.
      *
      * @return int
      */
     public function count(): int;
+
+    /**
+     * @param User $user
+     *
+     * @return bool
+     */
+    public function destroy(User $user): bool;
+
+    /**
+     * @param int $userId
+     *
+     * @return User
+     */
+    public function find(int $userId): User;
+
+    /**
+     * Return basic user information.
+     *
+     * @param User $user
+     *
+     * @return array
+     */
+    public function getUserData(User $user): array;
 }

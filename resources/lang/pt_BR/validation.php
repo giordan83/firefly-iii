@@ -3,13 +3,16 @@
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 return [
     'iban'                           => 'Este não é um válido IBAN.',
     'unique_account_number_for_user' => 'Parece que este número de conta já está em uso.',
+    'deleted_user'                   => 'Devido a restrições de segurança, você não pode registrar usando este endereço de e-mail.',
     'rule_trigger_value'             => 'Este valor é inválido para o disparo selecionado.',
     'rule_action_value'              => 'Este valor é inválido para a ação selecionada.',
     'invalid_domain'                 => 'Devido a restrições de segurança, você não pode registrar deste domínio.',
@@ -19,6 +22,8 @@ return [
     'file_too_large'                 => 'Arquivo ":name" é muito grande.',
     'belongs_to_user'                => 'O valor de :attribute é desconhecido',
     'accepted'                       => 'O campo :attribute deve ser aceito.',
+    'bic'                            => 'Este não é um BIC válido.',
+    'more'                           => ':attribute must be larger than zero.',
     'active_url'                     => 'O campo :attribute não contém um URL válido.',
     'after'                          => 'O campo :attribute deverá conter uma data posterior a :date.',
     'alpha'                          => 'O campo :attribute deverá conter apenas letras.',
@@ -77,4 +82,10 @@ return [
     'url'                            => 'O formato do URL indicado para o campo :attribute é inválido.',
     'timezone'                       => 'O campo :attribute deverá ter um fuso horário válido.',
     '2fa_code'                       => 'O campo :attribute é inválido.',
+    'dimensions'                     => 'O campo :attribute tem dimensões de imagem inválido.',
+    'distinct'                       => 'O campo :attribute tem um valor duplicado.',
+    'file'                           => 'O :attribute deve ser um arquivo.',
+    'in_array'                       => 'O campo :attribute não existe em :other.',
+    'present'                        => 'O campo :attribute deve estar presente.',
+    'amount_zero'                    => 'A quantidade total não pode ser zero',
 ];

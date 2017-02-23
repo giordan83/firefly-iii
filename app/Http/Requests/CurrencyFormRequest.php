@@ -3,16 +3,15 @@
  * CurrencyFormRequest.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Http\Requests;
-
-use Auth;
-use Input;
 
 /**
  * Class BillFormRequest
@@ -28,7 +27,7 @@ class CurrencyFormRequest extends Request
     public function authorize()
     {
         // Only allow logged in users
-        return Auth::check();
+        return auth()->check();
     }
 
     /**
@@ -37,9 +36,10 @@ class CurrencyFormRequest extends Request
     public function getCurrencyData()
     {
         return [
-            'name'   => $this->get('name'),
-            'code'   => $this->get('code'),
-            'symbol' => $this->get('symbol'),
+            'name'           => $this->string('name'),
+            'code'           => $this->string('code'),
+            'symbol'         => $this->string('symbol'),
+            'decimal_places' => $this->integer('decimal_places'),
         ];
     }
 
@@ -50,15 +50,17 @@ class CurrencyFormRequest extends Request
     {
 
         $rules = [
-            'code'   => 'required|min:3|max:3|unique:transaction_currencies,code',
-            'name'   => 'required|max:48|min:1|unique:transaction_currencies,name',
-            'symbol' => 'required|min:1|max:8|unique:transaction_currencies,symbol',
+            'name'           => 'required|max:48|min:1|unique:transaction_currencies,name',
+            'code'           => 'required|min:3|max:3|unique:transaction_currencies,code',
+            'symbol'         => 'required|min:1|max:8|unique:transaction_currencies,symbol',
+            'decimal_places' => 'required|min:0|max:12|numeric',
         ];
-        if (intval(Input::get('id')) > 0) {
+        if (intval($this->get('id')) > 0) {
             $rules = [
-                'code'   => 'required|min:3|max:3',
-                'name'   => 'required|max:48|min:1',
-                'symbol' => 'required|min:1|max:8',
+                'name'           => 'required|max:48|min:1',
+                'code'           => 'required|min:3|max:3',
+                'symbol'         => 'required|min:1|max:8',
+                'decimal_places' => 'required|min:0|max:12|numeric',
             ];
         }
 

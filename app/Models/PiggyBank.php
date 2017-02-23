@@ -3,65 +3,66 @@
  * PiggyBank.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Models;
 
-use Auth;
+use Carbon\Carbon;
 use Crypt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Steam;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * FireflyIII\Models\PiggyBank
+ * Class PiggyBank
  *
- * @property integer                                                             $id
- * @property \Carbon\Carbon                                                      $created_at
- * @property \Carbon\Carbon                                                      $updated_at
- * @property \Carbon\Carbon                                                      $deleted_at
- * @property integer                                                             $account_id
- * @property string                                                              $name
- * @property float                                                               $targetamount
- * @property \Carbon\Carbon                                                      $startdate
- * @property \Carbon\Carbon                                                      $targetdate
- * @property integer                                                             $order
- * @property boolean                                                             $encrypted
- * @property-read Account                                                        $account
- * @property-read \Illuminate\Database\Eloquent\Collection|PiggyBankRepetition[] $piggyBankRepetitions
- * @property-read \Illuminate\Database\Eloquent\Collection|PiggyBankEvent[]      $piggyBankEvents
- * @property string                                                              $reminder
- * @property PiggyBankRepetition                                                 $currentRep
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereAccountId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereName($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereTargetamount($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereStartdate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereTargetdate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereReminder($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereReminderSkip($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereRemindMe($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereOrder($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereDeletedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereEncrypted($value)
- * @mixin \Eloquent
- * @property boolean $active
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\PiggyBank whereActive($value)
+ * @package FireflyIII\Models
  */
 class PiggyBank extends Model
 {
     use SoftDeletes;
 
-    protected $fillable
-                      = ['name', 'account_id', 'order', 'targetamount', 'startdate', 'targetdate'];
-    protected $hidden = ['targetamount_encrypted', 'encrypted'];
-    protected $dates  = ['created_at', 'updated_at', 'deleted_at', 'startdate', 'targetdate'];
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+                        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+            'deleted_at' => 'date',
+            'startdate'  => 'date',
+            'targetdate' => 'date',
+            'order'      => 'int',
+            'active'     => 'boolean',
+            'encrypted'  => 'boolean',
+        ];
+    protected $dates    = ['created_at', 'updated_at', 'deleted_at', 'startdate', 'targetdate'];
+    protected $fillable = ['name', 'account_id', 'order', 'targetamount', 'startdate', 'targetdate'];
+    protected $hidden   = ['targetamount_encrypted', 'encrypted'];
+
+    /**
+     * @param PiggyBank $value
+     *
+     * @return PiggyBank
+     */
+    public static function routeBinder(PiggyBank $value)
+    {
+        if (auth()->check()) {
+            if ($value->account->user_id == auth()->user()->id) {
+                return $value;
+            }
+        }
+        throw new NotFoundHttpException;
+    }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -76,18 +77,72 @@ class PiggyBank extends Model
      *
      * @returns PiggyBankRepetition
      */
-    public function currentRelevantRep()
+    public function currentRelevantRep(): PiggyBankRepetition
     {
         if (!is_null($this->currentRep)) {
             return $this->currentRep;
         }
         // repeating piggy banks are no longer supported.
-        $rep              = $this->piggyBankRepetitions()->first(['piggy_bank_repetitions.*']);
+        $rep = $this->piggyBankRepetitions()->first(['piggy_bank_repetitions.*']);
+        if (is_null($rep)) {
+            return new PiggyBankRepetition();
+        }
         $this->currentRep = $rep;
 
         return $rep;
+    }
 
+    /**
+     *
+     * @param $value
+     *
+     * @return string
+     */
+    public function getNameAttribute($value)
+    {
 
+        if ($this->encrypted) {
+            return Crypt::decrypt($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     *
+     * @param Carbon $date
+     *
+     * @return string
+     */
+    public function leftOnAccount(Carbon $date): string
+    {
+
+        $balance = Steam::balanceIgnoreVirtual($this->account, $date);
+        /** @var PiggyBank $p */
+        foreach ($this->account->piggyBanks as $piggyBank) {
+            $currentAmount = $piggyBank->currentRelevantRep()->currentamount ?? '0';
+
+            $balance = bcsub($balance, $currentAmount);
+        }
+
+        return $balance;
+
+    }
+
+    /**
+     * Get all of the piggy bank's notes.
+     */
+    public function notes()
+    {
+        return $this->morphMany('FireflyIII\Models\Note', 'noteable');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function piggyBankEvents()
+    {
+        return $this->hasMany('FireflyIII\Models\PiggyBankEvent');
     }
 
     /**
@@ -101,35 +156,12 @@ class PiggyBank extends Model
     /**
      *
      * @param $value
-     *
-     * @return string
-     */
-    public function getNameAttribute($value)
-    {
-
-        if (intval($this->encrypted) == 1) {
-            return Crypt::decrypt($value);
-        }
-
-        return $value;
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function piggyBankEvents()
-    {
-        return $this->hasMany('FireflyIII\Models\PiggyBankEvent');
-    }
-
-    /**
-     *
-     * @param $value
      */
     public function setNameAttribute($value)
     {
-        $this->attributes['name']      = Crypt::encrypt($value);
-        $this->attributes['encrypted'] = true;
+        $encrypt                       = config('firefly.encryption');
+        $this->attributes['name']      = $encrypt ? Crypt::encrypt($value) : $value;
+        $this->attributes['encrypted'] = $encrypt;
     }
 
     /**
@@ -137,21 +169,6 @@ class PiggyBank extends Model
      */
     public function setTargetamountAttribute($value)
     {
-        $this->attributes['targetamount'] = strval(round($value, 2));
-    }
-
-    /**
-     * @param PiggyBank $value
-     *
-     * @return PiggyBank
-     */
-    public static function routeBinder(PiggyBank $value)
-    {
-        if (Auth::check()) {
-            if ($value->account->user_id == Auth::user()->id) {
-                return $value;
-            }
-        }
-        throw new NotFoundHttpException;
+        $this->attributes['targetamount'] = strval(round($value, 12));
     }
 }

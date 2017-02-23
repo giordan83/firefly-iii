@@ -3,8 +3,10 @@
  * TriggerFactory.php
  * Copyright (C) 2016 Robert Horlings
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -16,6 +18,7 @@ use FireflyIII\Models\RuleTrigger;
 use FireflyIII\Rules\Triggers\AbstractTrigger;
 use FireflyIII\Rules\Triggers\TriggerInterface;
 use FireflyIII\Support\Domain;
+use Log;
 
 /**
  * Interface TriggerInterface
@@ -45,6 +48,9 @@ class TriggerFactory
         $class = self::getTriggerClass($triggerType);
         $obj   = $class::makeFromTriggerValue($trigger->trigger_value);
 
+        Log::debug(sprintf('self::getTriggerClass("%s") = "%s"', $triggerType, $class));
+        Log::debug(sprintf('%s::makeFromTriggerValue(%s) = object of class "%s"', $class, $trigger->trigger_value, get_class($obj)));
+
         return $obj;
     }
 
@@ -68,6 +74,7 @@ class TriggerFactory
         /** @var AbstractTrigger $class */
         $class = self::getTriggerClass($triggerType);
         $obj   = $class::makeFromStrings($triggerValue, $stopProcessing);
+        Log::debug('Created trigger from string', ['type' => $triggerType, 'value' => $triggerValue, 'stopProcessing' => $stopProcessing, 'class' => $class]);
 
         return $obj;
     }

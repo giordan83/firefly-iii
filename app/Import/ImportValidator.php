@@ -3,8 +3,10 @@
  * ImportValidator.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -12,14 +14,16 @@ declare(strict_types = 1);
 namespace FireflyIII\Import;
 
 use Carbon\Carbon;
-use FireflyIII\Crud\Account\AccountCrudInterface;
 use FireflyIII\Models\Account;
 use FireflyIII\Models\AccountType;
+use FireflyIII\Models\ImportJob;
 use FireflyIII\Models\TransactionType;
+use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\Repositories\Currency\CurrencyRepositoryInterface;
 use FireflyIII\User;
 use Illuminate\Support\Collection;
 use Log;
+use Preferences;
 
 /**
  * Class ImportValidator
@@ -28,6 +32,8 @@ use Log;
  */
 class ImportValidator
 {
+    /** @var  ImportJob */
+    public $job;
     /** @var  Account */
     protected $defaultImportAccount;
     /** @var Collection */
@@ -50,6 +56,7 @@ class ImportValidator
      */
     public function clean(): Collection
     {
+        Log::notice(sprintf('Started validating %d entry(ies).', $this->entries->count()));
         $newCollection = new Collection;
         /** @var ImportEntry $entry */
         foreach ($this->entries as $index => $entry) {
@@ -70,7 +77,9 @@ class ImportValidator
             $entry = $this->setTransactionCurrency($entry);
 
             $newCollection->put($index, $entry);
+            $this->job->addStepsDone(1);
         }
+        Log::notice(sprintf('Finished validating %d entry(ies).', $newCollection->count()));
 
         return $newCollection;
     }
@@ -81,6 +90,14 @@ class ImportValidator
     public function setDefaultImportAccount(Account $defaultImportAccount)
     {
         $this->defaultImportAccount = $defaultImportAccount;
+    }
+
+    /**
+     * @param ImportJob $job
+     */
+    public function setJob(ImportJob $job)
+    {
+        $this->job = $job;
     }
 
     /**
@@ -100,7 +117,8 @@ class ImportValidator
     {
         if ($entry->fields['amount'] == 0) {
             $entry->valid = false;
-            Log::error('Amount of transaction is zero, cannot handle.');
+            $entry->errors->push('Amount of transaction is zero, cannot handle.');
+            Log::warning('Amount of transaction is zero, cannot handle.');
 
             return $entry;
         }
@@ -157,15 +175,33 @@ class ImportValidator
             return $account;
         }
         // find it first by new type:
-        /** @var AccountCrudInterface $repository */
-        $repository = app(AccountCrudInterface::class, [$this->user]);
-        $result     = $repository->findByName($account->name, [$type]);
+
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
+        $repository->setUser($this->user);
+
+        $result = $repository->findByName($account->name, [$type]);
         if (is_null($result->id)) {
             // can convert account:
-            Log::debug(sprintf('No account named %s of type %s, will convert.', $account->name, $type));
-            $result = $repository->updateAccountType($account, $type);
-
+            Log::debug(sprintf('No account named %s of type %s, create new account.', $account->name, $type));
+            $result = $repository->store(
+                [
+                    'user'           => $this->user->id,
+                    'accountType'    => config('firefly.shortNamesByFullName.' . $type),
+                    'name'           => $account->name,
+                    'virtualBalance' => 0,
+                    'active'         => true,
+                    'iban'           => null,
+                    'openingBalance' => 0,
+                ]
+            );
         }
+        Log::debug(
+            sprintf(
+                'Using another account named %s (#%d) of type %s, will use that one instead of %s (#%d)', $account->name, $result->id, $type, $account->name,
+                $account->id
+            )
+        );
 
         return $result;
 
@@ -178,10 +214,12 @@ class ImportValidator
     private function fallbackExpenseAccount(): Account
     {
 
-        /** @var AccountCrudInterface $repository */
-        $repository = app(AccountCrudInterface::class, [$this->user]);
-        $name       = 'Unknown expense account';
-        $result     = $repository->findByName($name, [AccountType::EXPENSE]);
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
+        $repository->setUser($this->user);
+
+        $name   = 'Unknown expense account';
+        $result = $repository->findByName($name, [AccountType::EXPENSE]);
         if (is_null($result->id)) {
             $result = $repository->store(
                 ['name'   => $name, 'iban' => null, 'openingBalance' => 0, 'user' => $this->user->id, 'accountType' => 'expense', 'virtualBalance' => 0,
@@ -198,10 +236,14 @@ class ImportValidator
     private function fallbackRevenueAccount(): Account
     {
 
-        /** @var AccountCrudInterface $repository */
-        $repository = app(AccountCrudInterface::class, [$this->user]);
-        $name       = 'Unknown revenue account';
-        $result     = $repository->findByName($name, [AccountType::REVENUE]);
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
+        $repository->setUser($this->user);
+
+        $name   = 'Unknown revenue account';
+        $result = $repository->findByName($name, [AccountType::REVENUE]);
+
+
         if (is_null($result->id)) {
             $result = $repository->store(
                 ['name'   => $name, 'iban' => null, 'openingBalance' => 0, 'user' => $this->user->id, 'accountType' => 'revenue', 'virtualBalance' => 0,
@@ -229,8 +271,9 @@ class ImportValidator
             // default import is null? should not happen. Entry cannot be imported.
             // set error message and block.
             $entry->valid = false;
-            Log::error('Cannot import entry. Asset account is NULL and import account is also NULL.');
+            Log::warning('Cannot import entry. Asset account is NULL and import account is also NULL.');
 
+            return $entry;
         }
         Log::debug('Asset account is OK.', ['id' => $entry->fields['asset-account']->id, 'name' => $entry->fields['asset-account']->name]);
 
@@ -319,7 +362,7 @@ class ImportValidator
         }
 
         // amount > 0, but opposing is expense
-        if ($type == AccountType::EXPENSE && $entry->fields['amount'] < 0) {
+        if ($type == AccountType::EXPENSE && $entry->fields['amount'] > 0) {
             $account                           = $this->convertAccount($entry->fields['opposing-account'], AccountType::REVENUE);
             $entry->fields['opposing-account'] = $account;
             Log::debug('Converted expense account to revenue account');
@@ -342,13 +385,17 @@ class ImportValidator
     {
         if (is_null($entry->fields['currency'])) {
             /** @var CurrencyRepositoryInterface $repository */
-            $repository                = app(CurrencyRepositoryInterface::class);
-            $entry->fields['currency'] = $repository->findByCode(env('DEFAULT_CURRENCY', 'EUR'));
-            Log::debug('Set currency to EUR');
+            $repository = app(CurrencyRepositoryInterface::class);
+            $repository->setUser($this->user);
+            // is the default currency for the user or the system
+            $defaultCode = Preferences::getForUser($this->user, 'currencyPreference', config('firefly.default_currency', 'EUR'))->data;
+
+            $entry->fields['currency'] = $repository->findByCode($defaultCode);
+            Log::debug(sprintf('Set currency to %s', $defaultCode));
 
             return $entry;
         }
-        Log::debug('Currency is OK');
+        Log::debug(sprintf('Currency is OK: %s', $entry->fields['currency']->code));
 
         return $entry;
     }
@@ -373,14 +420,16 @@ class ImportValidator
                 Log::debug('Transaction type is now deposit.');
 
                 return $entry;
+            case AccountType::DEFAULT:
             case AccountType::ASSET:
                 $entry->fields['transaction-type'] = TransactionType::whereType(TransactionType::TRANSFER)->first();
                 Log::debug('Transaction type is now transfer.');
 
                 return $entry;
         }
-        Log::error(sprintf('Opposing account is of type %s, cannot handle this.', $type));
+        Log::warning(sprintf('Opposing account is of type %s, cannot handle this.', $type));
         $entry->valid = false;
+        $entry->errors->push(sprintf('Opposing account is of type %s, cannot handle this.', $type));
 
         return $entry;
     }

@@ -3,17 +3,17 @@
  * RuleFormRequest.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Http\Requests;
 
-use Auth;
-use FireflyIII\Models\RuleGroup;
-use Input;
+use FireflyIII\Repositories\RuleGroup\RuleGroupRepositoryInterface;
 
 /**
  * Class RuleFormRequest
@@ -29,7 +29,27 @@ class RuleFormRequest extends Request
     public function authorize()
     {
         // Only allow logged in users
-        return Auth::check();
+        return auth()->check();
+    }
+
+    /**
+     * @return array
+     */
+    public function getRuleData(): array
+    {
+        return [
+            'title'               => $this->string('title'),
+            'active'              => $this->boolean('active'),
+            'trigger'             => $this->string('trigger'),
+            'description'         => $this->string('description'),
+            'rule-triggers'       => $this->get('rule-trigger'),
+            'rule-trigger-values' => $this->get('rule-trigger-value'),
+            'rule-trigger-stop'   => $this->get('rule-trigger-stop'),
+            'rule-actions'        => $this->get('rule-action'),
+            'rule-action-values'  => $this->get('rule-action-value'),
+            'rule-action-stop'    => $this->get('rule-action-stop'),
+            'stop_processing'     => $this->boolean('stop_processing'),
+        ];
     }
 
     /**
@@ -37,7 +57,8 @@ class RuleFormRequest extends Request
      */
     public function rules()
     {
-
+        /** @var RuleGroupRepositoryInterface $repository */
+        $repository    = app(RuleGroupRepositoryInterface::class);
         $validTriggers = array_keys(config('firefly.rule-triggers'));
         $validActions  = array_keys(config('firefly.rule-actions'));
 
@@ -45,8 +66,8 @@ class RuleFormRequest extends Request
         $contextActions = join(',', config('firefly.rule-actions-text'));
 
         $titleRule = 'required|between:1,100|uniqueObjectForUser:rule_groups,title';
-        if (RuleGroup::find(Input::get('id'))) {
-            $titleRule = 'required|between:1,100|uniqueObjectForUser:rule_groups,title,' . intval(Input::get('id'));
+        if (!is_null($repository->find(intval($this->get('id')))->id)) {
+            $titleRule = 'required|between:1,100|uniqueObjectForUser:rule_groups,title,' . intval($this->get('id'));
         }
 
         $rules = [

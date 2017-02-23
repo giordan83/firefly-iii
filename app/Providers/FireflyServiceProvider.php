@@ -3,25 +3,49 @@
  * FireflyServiceProvider.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Providers;
 
+use FireflyIII\Export\Processor;
+use FireflyIII\Export\ProcessorInterface;
+use FireflyIII\Generator\Chart\Basic\ChartJsGenerator;
+use FireflyIII\Generator\Chart\Basic\GeneratorInterface;
+use FireflyIII\Helpers\Attachments\AttachmentHelper;
+use FireflyIII\Helpers\Attachments\AttachmentHelperInterface;
+use FireflyIII\Helpers\Chart\MetaPieChart;
+use FireflyIII\Helpers\Chart\MetaPieChartInterface;
+use FireflyIII\Helpers\FiscalHelper;
+use FireflyIII\Helpers\FiscalHelperInterface;
+use FireflyIII\Helpers\Help\Help;
+use FireflyIII\Helpers\Help\HelpInterface;
+use FireflyIII\Helpers\Report\BalanceReportHelper;
+use FireflyIII\Helpers\Report\BalanceReportHelperInterface;
+use FireflyIII\Helpers\Report\BudgetReportHelper;
+use FireflyIII\Helpers\Report\BudgetReportHelperInterface;
+use FireflyIII\Helpers\Report\ReportHelper;
+use FireflyIII\Helpers\Report\ReportHelperInterface;
+use FireflyIII\Import\ImportProcedure;
+use FireflyIII\Import\ImportProcedureInterface;
+use FireflyIII\Repositories\User\UserRepository;
+use FireflyIII\Repositories\User\UserRepositoryInterface;
 use FireflyIII\Support\Amount;
 use FireflyIII\Support\ExpandedForm;
 use FireflyIII\Support\FireflyConfig;
 use FireflyIII\Support\Navigation;
 use FireflyIII\Support\Preferences;
 use FireflyIII\Support\Steam;
-use FireflyIII\Support\Twig\Budget;
 use FireflyIII\Support\Twig\General;
 use FireflyIII\Support\Twig\Journal;
 use FireflyIII\Support\Twig\PiggyBank;
 use FireflyIII\Support\Twig\Rule;
+use FireflyIII\Support\Twig\Transaction;
 use FireflyIII\Support\Twig\Translation;
 use FireflyIII\Validation\FireflyValidator;
 use Illuminate\Support\ServiceProvider;
@@ -48,8 +72,8 @@ class FireflyServiceProvider extends ServiceProvider
         Twig::addExtension(new PiggyBank);
         Twig::addExtension(new General);
         Twig::addExtension(new Journal);
-        Twig::addExtension(new Budget);
         Twig::addExtension(new Translation);
+        Twig::addExtension(new Transaction);
         Twig::addExtension(new Rule);
     }
 
@@ -91,28 +115,23 @@ class FireflyServiceProvider extends ServiceProvider
         }
         );
 
-        $this->app->bind('FireflyIII\Repositories\Currency\CurrencyRepositoryInterface', 'FireflyIII\Repositories\Currency\CurrencyRepository');
-        $this->app->bind('FireflyIII\Support\Search\SearchInterface', 'FireflyIII\Support\Search\Search');
-        $this->app->bind('FireflyIII\Repositories\User\UserRepositoryInterface', 'FireflyIII\Repositories\User\UserRepository');
-        $this->app->bind('FireflyIII\Helpers\Attachments\AttachmentHelperInterface', 'FireflyIII\Helpers\Attachments\AttachmentHelper');
-        $this->app->bind(
-            'FireflyIII\Generator\Chart\Account\AccountChartGeneratorInterface', 'FireflyIII\Generator\Chart\Account\ChartJsAccountChartGenerator'
-        );
-        $this->app->bind('FireflyIII\Generator\Chart\Bill\BillChartGeneratorInterface', 'FireflyIII\Generator\Chart\Bill\ChartJsBillChartGenerator');
-        $this->app->bind('FireflyIII\Generator\Chart\Budget\BudgetChartGeneratorInterface', 'FireflyIII\Generator\Chart\Budget\ChartJsBudgetChartGenerator');
-        $this->app->bind(
-            'FireflyIII\Generator\Chart\Category\CategoryChartGeneratorInterface', 'FireflyIII\Generator\Chart\Category\ChartJsCategoryChartGenerator'
-        );
-        $this->app->bind(
-            'FireflyIII\Generator\Chart\PiggyBank\PiggyBankChartGeneratorInterface', 'FireflyIII\Generator\Chart\PiggyBank\ChartJsPiggyBankChartGenerator'
-        );
-        $this->app->bind('FireflyIII\Generator\Chart\Report\ReportChartGeneratorInterface', 'FireflyIII\Generator\Chart\Report\ChartJsReportChartGenerator');
-        $this->app->bind('FireflyIII\Helpers\Help\HelpInterface', 'FireflyIII\Helpers\Help\Help');
-        $this->app->bind('FireflyIII\Helpers\Report\ReportHelperInterface', 'FireflyIII\Helpers\Report\ReportHelper');
-        $this->app->bind('FireflyIII\Helpers\FiscalHelperInterface', 'FireflyIII\Helpers\FiscalHelper');
-        $this->app->bind('FireflyIII\Helpers\Report\AccountReportHelperInterface', 'FireflyIII\Helpers\Report\AccountReportHelper');
-        $this->app->bind('FireflyIII\Helpers\Report\BalanceReportHelperInterface', 'FireflyIII\Helpers\Report\BalanceReportHelper');
-        $this->app->bind('FireflyIII\Helpers\Report\BudgetReportHelperInterface', 'FireflyIII\Helpers\Report\BudgetReportHelper');
+        // chart generator:
+        $this->app->bind(GeneratorInterface::class, ChartJsGenerator::class);
+
+        // chart builder
+        $this->app->bind(MetaPieChartInterface::class, MetaPieChart::class);
+
+        // other generators
+        $this->app->bind(ProcessorInterface::class, Processor::class);
+        $this->app->bind(ImportProcedureInterface::class, ImportProcedure::class);
+        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
+        $this->app->bind(AttachmentHelperInterface::class, AttachmentHelper::class);
+
+        $this->app->bind(HelpInterface::class, Help::class);
+        $this->app->bind(ReportHelperInterface::class, ReportHelper::class);
+        $this->app->bind(FiscalHelperInterface::class, FiscalHelper::class);
+        $this->app->bind(BalanceReportHelperInterface::class, BalanceReportHelper::class);
+        $this->app->bind(BudgetReportHelperInterface::class, BudgetReportHelper::class);
     }
 
 }

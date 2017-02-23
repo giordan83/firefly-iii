@@ -3,8 +3,10 @@
  * CsvSetup.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -13,13 +15,14 @@ namespace FireflyIII\Import\Setup;
 
 
 use ExpandedForm;
-use FireflyIII\Crud\Account\AccountCrud;
+use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Import\Mapper\MapperInterface;
 use FireflyIII\Import\MapperPreProcess\PreProcessorInterface;
 use FireflyIII\Import\Specifics\SpecificInterface;
 use FireflyIII\Models\Account;
 use FireflyIII\Models\AccountType;
 use FireflyIII\Models\ImportJob;
+use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use Illuminate\Http\Request;
 use League\Csv\Reader;
 use Log;
@@ -32,7 +35,6 @@ use Symfony\Component\HttpFoundation\FileBag;
  */
 class CsvSetup implements SetupInterface
 {
-    const EXAMPLE_ROWS = 5;
     /** @var  Account */
     public $defaultImportAccount;
     /** @var  ImportJob */
@@ -49,29 +51,13 @@ class CsvSetup implements SetupInterface
     /**
      * Create initial (empty) configuration array.
      *
-     *
-     *
      * @return bool
      */
     public function configure(): bool
     {
         if (is_null($this->job->configuration) || (is_array($this->job->configuration) && count($this->job->configuration) === 0)) {
             Log::debug('No config detected, will create empty one.');
-
-            $config                   = [
-                'has-headers'             => false, // assume
-                'date-format'             => 'Ymd', // assume
-                'delimiter'               => ',', // assume
-                'import-account'          => 0, // none,
-                'specifics'               => [], // none
-                'column-count'            => 0, // unknown
-                'column-roles'            => [], // unknown
-                'column-do-mapping'       => [], // not yet set which columns must be mapped
-                'column-roles-complete'   => false, // not yet configured roles for columns
-                'column-mapping-config'   => [], // no mapping made yet.
-                'column-mapping-complete' => false, // so mapping is not complete.
-            ];
-            $this->job->configuration = $config;
+            $this->job->configuration = config('csv.default_config');
             $this->job->save();
 
             return true;
@@ -88,9 +74,10 @@ class CsvSetup implements SetupInterface
      */
     public function getConfigurationData(): array
     {
-        $crud       = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $accounts   = $crud->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]);
-        $delimiters = [
+        /** @var AccountRepositoryInterface $accountRepository */
+        $accountRepository = app(AccountRepositoryInterface::class);
+        $accounts          = $accountRepository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]);
+        $delimiters        = [
             ','   => trans('form.csv_comma'),
             ';'   => trans('form.csv_semicolon'),
             'tab' => trans('form.csv_tab'),
@@ -125,14 +112,16 @@ class CsvSetup implements SetupInterface
      */
     public function getDataForSettings(): array
     {
-
+        Log::debug('Now in getDataForSettings()');
         if ($this->doColumnRoles()) {
+            Log::debug('doColumnRoles() is true.');
             $data = $this->getDataForColumnRoles();
 
             return $data;
         }
 
         if ($this->doColumnMapping()) {
+            Log::debug('doColumnMapping() is true.');
             $data = $this->getDataForColumnMapping();
 
             return $data;
@@ -148,6 +137,7 @@ class CsvSetup implements SetupInterface
      * the import job.
      *
      * @return string
+     * @throws FireflyException
      */
     public function getViewForSettings(): string
     {
@@ -158,9 +148,7 @@ class CsvSetup implements SetupInterface
         if ($this->doColumnMapping()) {
             return 'import.csv.map';
         }
-
-        echo 'no view for settings';
-        exit;
+        throw new FireflyException('There is no view for the current CSV import step.');
     }
 
     /**
@@ -171,8 +159,8 @@ class CsvSetup implements SetupInterface
      */
     public function requireUserSettings(): bool
     {
-        Log::debug('doColumnMapping is ' . ($this->doColumnMapping() ? 'true' : 'false'));
-        Log::debug('doColumnRoles is ' . ($this->doColumnRoles() ? 'true' : 'false'));
+        Log::debug(sprintf('doColumnMapping is %s', $this->doColumnMapping()));
+        Log::debug(sprintf('doColumnRoles is %s', $this->doColumnRoles()));
         if ($this->doColumnMapping() || $this->doColumnRoles()) {
             Log::debug('Return true');
 
@@ -184,14 +172,16 @@ class CsvSetup implements SetupInterface
     }
 
     /**
-     * @param array $data
+     * @param array   $data
+     *
+     * @param FileBag $files
      *
      * @return bool
      */
     public function saveImportConfiguration(array $data, FileBag $files): bool
     {
-        /** @var AccountCrud $repository */
-        $repository = app(AccountCrud::class, [auth()->user()]);
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
         $importId   = $data['csv_import_account'] ?? 0;
         $account    = $repository->find(intval($importId));
 
@@ -214,7 +204,11 @@ class CsvSetup implements SetupInterface
         // loop specifics.
         if (isset($data['specifics']) && is_array($data['specifics'])) {
             foreach ($data['specifics'] as $name => $enabled) {
-                $config['specifics'][$name] = 1;
+                // verify their content.
+                $className = sprintf('FireflyIII\Import\Specifics\%s', $name);
+                if (class_exists($className)) {
+                    $config['specifics'][$name] = 1;
+                }
             }
         }
         $this->job->configuration = $config;
@@ -320,6 +314,7 @@ class CsvSetup implements SetupInterface
 
     /**
      * @return array
+     * @throws FireflyException
      */
     private function getDataForColumnMapping(): array
     {
@@ -329,11 +324,20 @@ class CsvSetup implements SetupInterface
 
         foreach ($config['column-do-mapping'] as $index => $mustBeMapped) {
             if ($mustBeMapped) {
-                $column        = $config['column-roles'][$index] ?? '_ignore';
+
+                $column = $config['column-roles'][$index] ?? '_ignore';
+
+                // is valid column?
+                $validColumns = array_keys(config('csv.import_roles'));
+                if (!in_array($column, $validColumns)) {
+                    throw new FireflyException(sprintf('"%s" is not a valid column.', $column));
+                }
+
                 $canBeMapped   = config('csv.import_roles.' . $column . '.mappable');
                 $preProcessMap = config('csv.import_roles.' . $column . '.pre-process-map');
                 if ($canBeMapped) {
-                    $mapperName = '\FireflyIII\Import\Mapper\\' . config('csv.import_roles.' . $column . '.mapper');
+                    $mapperClass = config('csv.import_roles.' . $column . '.mapper');
+                    $mapperName  = sprintf('\\FireflyIII\\Import\Mapper\\%s', $mapperClass);
                     /** @var MapperInterface $mapper */
                     $mapper       = new $mapperName;
                     $indexes[]    = $index;
@@ -346,8 +350,11 @@ class CsvSetup implements SetupInterface
                         'values'        => [],
                     ];
                     if ($preProcessMap) {
-                        $data[$index]['preProcessMap'] = '\FireflyIII\Import\MapperPreProcess\\' .
-                                                         config('csv.import_roles.' . $column . '.pre-process-mapper');
+                        $preClass                      = sprintf(
+                            '\\FireflyIII\\Import\\MapperPreProcess\\%s',
+                            config('csv.import_roles.' . $column . '.pre-process-mapper')
+                        );
+                        $data[$index]['preProcessMap'] = $preClass;
                     }
                 }
 
@@ -359,15 +366,26 @@ class CsvSetup implements SetupInterface
         /** @var Reader $reader */
         $reader = Reader::createFromString($content);
         $reader->setDelimiter($config['delimiter']);
-        $results = $reader->fetch();
+        $results        = $reader->fetch();
+        $validSpecifics = array_keys(config('csv.import_specifics'));
 
         foreach ($results as $rowIndex => $row) {
+
+            // skip first row?
+            if ($rowIndex === 0 && $config['has-headers']) {
+                continue;
+            }
 
             // run specifics here:
             // and this is the point where the specifix go to work.
             foreach ($config['specifics'] as $name => $enabled) {
+
+                if (!in_array($name, $validSpecifics)) {
+                    throw new FireflyException(sprintf('"%s" is not a valid class name', $name));
+                }
+                $class = config('csv.import_specifics.' . $name);
                 /** @var SpecificInterface $specific */
-                $specific = app('FireflyIII\Import\Specifics\\' . $name);
+                $specific = app($class);
 
                 // it returns the row, possibly modified:
                 $row = $specific->run($row);
@@ -375,6 +393,10 @@ class CsvSetup implements SetupInterface
 
             //do something here
             foreach ($indexes as $index) { // this is simply 1, 2, 3, etc.
+                if (!isset($row[$index])) {
+                    // don't really know how to handle this. Just skip, for now.
+                    continue;
+                }
                 $value = $row[$index];
                 if (strlen($value) > 0) {
 
@@ -406,14 +428,18 @@ class CsvSetup implements SetupInterface
     }
 
     /**
+     * This method collects the data that will enable a user to choose column content.
+     *
      * @return array
      */
-    private function getDataForColumnRoles():array
+    private function getDataForColumnRoles(): array
     {
+        Log::debug('Now in getDataForColumnRoles()');
         $config = $this->job->configuration;
         $data   = [
-            'columns'     => [],
-            'columnCount' => 0,
+            'columns'       => [],
+            'columnCount'   => 0,
+            'columnHeaders' => [],
         ];
 
         // show user column role configuration.
@@ -422,25 +448,32 @@ class CsvSetup implements SetupInterface
         // create CSV reader.
         $reader = Reader::createFromString($content);
         $reader->setDelimiter($config['delimiter']);
-        $start = $config['has-headers'] ? 1 : 0;
-        $end   = $start + self::EXAMPLE_ROWS; // first X rows
+        $start  = $config['has-headers'] ? 1 : 0;
+        $end    = $start + config('csv.example_rows');
+        $header = [];
+        if ($config['has-headers']) {
+            $header = $reader->fetchOne(0);
+        }
+
 
         // collect example data in $data['columns']
+        Log::debug(sprintf('While %s is smaller than %d', $start, $end));
         while ($start < $end) {
             $row = $reader->fetchOne($start);
-
+            Log::debug(sprintf('Row %d has %d columns', $start, count($row)));
             // run specifics here:
             // and this is the point where the specifix go to work.
             foreach ($config['specifics'] as $name => $enabled) {
                 /** @var SpecificInterface $specific */
                 $specific = app('FireflyIII\Import\Specifics\\' . $name);
-
+                Log::debug(sprintf('Will now apply specific "%s" to row %d.', $name, $start));
                 // it returns the row, possibly modified:
                 $row = $specific->run($row);
             }
 
             foreach ($row as $index => $value) {
-                $value = trim($value);
+                $value                         = trim($value);
+                $data['columnHeaders'][$index] = $header[$index] ?? '';
                 if (strlen($value) > 0) {
                     $data['columns'][$index][] = $value;
                 }

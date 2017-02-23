@@ -1,7 +1,13 @@
 <?php
-declare(strict_types = 1);
-
-
+/**
+ * filesystems.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
 
 return [
 
@@ -63,12 +69,19 @@ return [
             'driver' => 'local',
             'root'   => storage_path('database'),
         ],
+        'seeds'    => [
+            'driver' => 'local',
+            'root'   => base_path('resources/seeds'),
+        ],
+        'stubs'    => [
+            'driver' => 'local',
+            'root'   => base_path('resources/stubs'),
+        ],
 
-        'ftp' => [
-            'driver'   => 'ftp',
-            'host'     => 'ftp.example.com',
-            'username' => 'your-username',
-            'password' => 'your-password',
+        'public' => [
+            'driver'     => 'local',
+            'root'       => storage_path('app/public'),
+            'visibility' => 'public',
         ],
 
         's3' => [
@@ -77,16 +90,6 @@ return [
             'secret' => 'your-secret',
             'region' => 'your-region',
             'bucket' => 'your-bucket',
-        ],
-
-        'rackspace' => [
-            'driver'    => 'rackspace',
-            'username'  => 'your-username',
-            'key'       => 'your-key',
-            'container' => 'your-container',
-            'endpoint'  => 'https://identity.api.rackspacecloud.com/v2.0/',
-            'region'    => 'IAD',
-            'url_type'  => 'publicURL',
         ],
 
     ],

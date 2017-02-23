@@ -3,8 +3,10 @@
  * CategoryRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -13,7 +15,7 @@ namespace FireflyIII\Repositories\Category;
 
 use Carbon\Carbon;
 use FireflyIII\Models\Category;
-use Illuminate\Pagination\LengthAwarePaginator;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,7 +25,6 @@ use Illuminate\Support\Collection;
  */
 interface CategoryRepositoryInterface
 {
-
     /**
      * @param Category $category
      *
@@ -42,22 +43,13 @@ interface CategoryRepositoryInterface
     public function earnedInPeriod(Collection $categories, Collection $accounts, Carbon $start, Carbon $end): string;
 
     /**
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return string
-     */
-    public function earnedInPeriodWithoutCategory(Collection $accounts, Carbon $start, Carbon $end) :string;
-
-    /**
      * Find a category
      *
      * @param int $categoryId
      *
      * @return Category
      */
-    public function find(int $categoryId) : Category;
+    public function find(int $categoryId): Category;
 
     /**
      * Find a category
@@ -66,15 +58,14 @@ interface CategoryRepositoryInterface
      *
      * @return Category
      */
-    public function findByName(string $name) : Category;
+    public function findByName(string $name): Category;
 
     /**
-     * @param Category   $category
-     * @param Collection $accounts
+     * @param Category $category
      *
      * @return Carbon
      */
-    public function firstUseDate(Category $category, Collection $accounts): Carbon;
+    public function firstUseDate(Category $category): Carbon;
 
     /**
      * Returns a list of all the categories belonging to a user.
@@ -82,36 +73,6 @@ interface CategoryRepositoryInterface
      * @return Collection
      */
     public function getCategories(): Collection;
-
-    /**
-     * @param Category $category
-     * @param int      $page
-     * @param int      $pageSize
-     *
-     * @return LengthAwarePaginator
-     */
-    public function getJournals(Category $category, int $page, int $pageSize): LengthAwarePaginator;
-
-    /**
-     * @param Collection $categories
-     * @param Collection $accounts
-     * @param array      $types
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return Collection
-     */
-    public function journalsInPeriod(Collection $categories, Collection $accounts, array $types, Carbon $start, Carbon $end): Collection;
-
-    /**
-     * @param Collection $accounts
-     * @param array      $types
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return Collection
-     */
-    public function journalsInPeriodWithoutCategory(Collection $accounts, array $types, Carbon $start, Carbon $end) : Collection;
 
     /**
      * Return most recent transaction(journal) date.
@@ -122,6 +83,49 @@ interface CategoryRepositoryInterface
      * @return Carbon
      */
     public function lastUseDate(Category $category, Collection $accounts): Carbon;
+
+    /**
+     * @param Collection $categories
+     * @param Collection $accounts
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return array
+     */
+    public function periodExpenses(Collection $categories, Collection $accounts, Carbon $start, Carbon $end): array;
+
+    /**
+     * @param Collection $accounts
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return array
+     */
+    public function periodExpensesNoCategory(Collection $accounts, Carbon $start, Carbon $end): array;
+
+    /**
+     * @param Collection $categories
+     * @param Collection $accounts
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return array
+     */
+    public function periodIncome(Collection $categories, Collection $accounts, Carbon $start, Carbon $end): array;
+
+    /**
+     * @param Collection $accounts
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return array
+     */
+    public function periodIncomeNoCategory(Collection $accounts, Carbon $start, Carbon $end): array;
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 
     /**
      * @param Collection $categories
@@ -140,7 +144,7 @@ interface CategoryRepositoryInterface
      *
      * @return string
      */
-    public function spentInPeriodWithoutCategory(Collection $accounts, Carbon $start, Carbon $end) : string;
+    public function spentInPeriodWithoutCategory(Collection $accounts, Carbon $start, Carbon $end): string;
 
     /**
      * @param array $data

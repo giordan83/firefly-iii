@@ -3,21 +3,22 @@
  * Import.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Console\Commands;
 
-use FireflyIII\Crud\Account\AccountCrud;
-use FireflyIII\Import\Importer\ImporterInterface;
-use FireflyIII\Import\ImportStorage;
-use FireflyIII\Import\ImportValidator;
+use FireflyIII\Import\ImportProcedure;
 use FireflyIII\Import\Logging\CommandHandler;
 use FireflyIII\Models\ImportJob;
+use FireflyIII\Models\TransactionJournal;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Log;
 
 /**
@@ -32,14 +33,14 @@ class Import extends Command
      *
      * @var string
      */
-    protected $description = 'Import stuff into Firefly III.';
+    protected $description = 'This will start a new import.';
 
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'firefly:import {key}';
+    protected $signature = 'firefly:start-import {key}';
 
     /**
      * Create a new command instance.
@@ -51,63 +52,88 @@ class Import extends Command
     }
 
     /**
-     * Execute the console command.
      *
-     * @return mixed
      */
     public function handle()
     {
+        Log::debug('Start start-import command');
         $jobKey = $this->argument('key');
         $job    = ImportJob::whereKey($jobKey)->first();
+        if (!$this->isValid($job)) {
+            Log::error('Job is not valid for some reason. Exit.');
+
+            return;
+        }
+
+        $this->line(sprintf('Going to import job with key "%s" of type "%s"', $job->key, $job->file_type));
+
+        $monolog = Log::getMonolog();
+        $handler = new CommandHandler($this);
+        $monolog->pushHandler($handler);
+        $importProcedure = new ImportProcedure;
+        $result          = $importProcedure->runImport($job);
+
+        // display result to user:
+        $this->presentResults($result);
+        $this->line('The import has completed.');
+
+        // get any errors from the importer:
+        $this->presentErrors($job);
+
+        return;
+    }
+
+    /**
+     * @param ImportJob $job
+     *
+     * @return bool
+     */
+    private function isValid(ImportJob $job): bool
+    {
         if (is_null($job)) {
             $this->error('This job does not seem to exist.');
 
-            return;
+            return false;
         }
 
         if ($job->status != 'settings_complete') {
             $this->error('This job is not ready to be imported.');
 
-            return;
+            return false;
         }
 
-        $this->line('Going to import job with key "' . $job->key . '" of type ' . $job->file_type);
-        $valid = array_keys(config('firefly.import_formats'));
-        $class = 'INVALID';
-        if (in_array($job->file_type, $valid)) {
-            $class = config('firefly.import_formats.' . $job->file_type);
+        return true;
+    }
+
+    /**
+     * @param ImportJob $job
+     */
+    private function presentErrors(ImportJob $job)
+    {
+        $extendedStatus = $job->extended_status;
+        if (isset($extendedStatus['errors']) && count($extendedStatus['errors']) > 0) {
+            $this->line(sprintf('The following %d error(s) occured during the import:', count($extendedStatus['errors'])));
+            foreach ($extendedStatus['errors'] as $error) {
+                $this->error($error);
+            }
         }
+    }
 
-        /** @var ImporterInterface $importer */
-        $importer = app($class);
-        $importer->setJob($job);
-        // intercept logging by importer.
-        $monolog = Log::getMonolog();
-        $handler = new CommandHandler($this);
-
-        $monolog->pushHandler($handler);
-
-        // create import entries
-        $collection = $importer->createImportEntries();
-
-        // validate / clean collection:
-        $validator = new ImportValidator($collection);
-        $validator->setUser($job->user);
-        if ($job->configuration['import-account'] != 0) {
-            $repository = app(AccountCrud::class, [$job->user]);
-            $validator->setDefaultImportAccount($repository->find($job->configuration['import-account']));
+    /**
+     * @param Collection $result
+     */
+    private function presentResults(Collection $result)
+    {
+        /**
+         * @var int                $index
+         * @var TransactionJournal $journal
+         */
+        foreach ($result as $index => $journal) {
+            if (!is_null($journal->id)) {
+                $this->line(sprintf('Line #%d has been imported as transaction #%d.', $index, $journal->id));
+                continue;
+            }
+            $this->error(sprintf('Could not store line #%d', $index));
         }
-
-        $cleaned = $validator->clean();
-
-        // then import collection:
-        $storage = new ImportStorage($cleaned);
-        $storage->setUser($job->user);
-
-        // and run store routine:
-        $storage->store();
-
-
-        $this->line('Something something import: ' . $jobKey);
     }
 }

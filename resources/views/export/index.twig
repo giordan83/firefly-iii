@@ -1,4 +1,4 @@
-{% extends "./layout/default.twig" %}
+{% extends "./layout/default" %}
 
 {% block breadcrumbs %}
     {{ Breadcrumbs.renderIfExists(Route.getCurrentRoute.getName) }}
@@ -33,7 +33,8 @@
                         </div>
                         <div id="export-download" style="display:none;">
                             <p class="text-center text-info" id="download-holder">
-                                <a id="download-link" class="btn btn-lg btn-success" href="{{ route('export.download', job.key) }}"><i class="fa fa-fw fa-download"></i> Download</a>
+                                <a id="download-link" class="btn btn-lg btn-success" href="{{ route('export.download', job.key) }}"><i
+                                            class="fa fa-fw fa-download"></i> Download</a>
                             </p>
                         </div>
                         <div id="export-error" style="display:none;">
@@ -80,8 +81,6 @@
 
                                     {{ ExpandedForm.checkbox('include_attachments','1', true) }}
 
-                                    {{ ExpandedForm.checkbox('include_config','1', true, {helpText: 'include_config_help'|_}) }}
-
                                     {{ ExpandedForm.checkbox('include_old_uploads','1', false, {helpText: 'include_old_uploads_help'|_}) }}
                                 </div>
                             </div>
@@ -99,7 +98,13 @@
 {% endblock %}
 {% block scripts %}
     <script type="text/javascript">
-        var jobKey = "{{ job.key }}";
+        var jobKey = "{{ job.key|escape }}";
     </script>
+    <script type="text/javascript" src="js/lib/modernizr-custom.js"></script>
+    <script type="text/javascript" src="js/lib/jquery-ui.min.js"></script>
     <script type="text/javascript" src="js/ff/export/index.js"></script>
+{% endblock %}
+{% block styles %}
+    <link href="css/jquery-ui/jquery-ui.structure.min.css" type="text/css" rel="stylesheet" media="all">
+    <link href="css/jquery-ui/jquery-ui.theme.min.css" type="text/css" rel="stylesheet" media="all">
 {% endblock %}

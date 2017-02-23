@@ -3,8 +3,10 @@
  * BudgetLimit.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -12,36 +14,50 @@ declare(strict_types = 1);
 namespace FireflyIII\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * FireflyIII\Models\BudgetLimit
+ * Class BudgetLimit
  *
- * @property integer                                                         $id
- * @property \Carbon\Carbon                                                  $created_at
- * @property \Carbon\Carbon                                                  $updated_at
- * @property integer                                                         $budget_id
- * @property \Carbon\Carbon                                                  $startdate
- * @property float                                                           $amount
- * @property boolean                                                         $repeats
- * @property string                                                          $repeat_freq
- * @property-read Budget                                                     $budget
- * @property int                                                             $component_id
- * @property-read \Illuminate\Database\Eloquent\Collection|LimitRepetition[] $limitrepetitions
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereBudgetId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereStartdate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereAmount($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereRepeats($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\BudgetLimit whereRepeatFreq($value)
- * @mixin \Eloquent
+ * @package FireflyIII\Models
  */
 class BudgetLimit extends Model
 {
 
-    protected $dates  = ['created_at', 'updated_at', 'startdate'];
-    protected $hidden = ['amount_encrypted'];
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+            'start_date' => 'date',
+            'end_date'   => 'date',
+            'repeats'    => 'boolean',
+        ];
+    /** @var array */
+    protected $dates = ['created_at', 'updated_at', 'start_date', 'end_date'];
+
+    /**
+     * @param $value
+     *
+     * @return mixed
+     */
+    public static function routeBinder($value)
+    {
+        if (auth()->check()) {
+            $object = self::where('budget_limits.id', $value)
+                          ->leftJoin('budgets', 'budgets.id', '=', 'budget_limits.budget_id')
+                          ->where('budgets.user_id', auth()->user()->id)
+                          ->first(['budget_limits.*']);
+            if ($object) {
+                return $object;
+            }
+        }
+        throw new NotFoundHttpException;
+    }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -59,12 +75,13 @@ class BudgetLimit extends Model
         return $this->hasMany('FireflyIII\Models\LimitRepetition');
     }
 
+
     /**
      * @param $value
      */
     public function setAmountAttribute($value)
     {
-        $this->attributes['amount'] = strval(round($value, 2));
+        $this->attributes['amount'] = strval(round($value, 12));
     }
 
 }

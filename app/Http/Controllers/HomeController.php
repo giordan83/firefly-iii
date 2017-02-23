@@ -3,8 +3,10 @@
  * HomeController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -12,20 +14,17 @@ namespace FireflyIII\Http\Controllers;
 
 use Artisan;
 use Carbon\Carbon;
-use FireflyIII\Crud\Account\AccountCrudInterface;
 use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Helpers\Collector\JournalCollectorInterface;
 use FireflyIII\Models\AccountType;
-use FireflyIII\Models\Tag;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface as ARI;
-use FireflyIII\Repositories\Tag\TagRepositoryInterface;
+use FireflyIII\Repositories\Bill\BillRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Log;
 use Preferences;
-use Route;
 use Session;
-use Steam;
-
+use View;
 
 /**
  * Class HomeController
@@ -40,6 +39,8 @@ class HomeController extends Controller
     public function __construct()
     {
         parent::__construct();
+        View::share('title', 'Firefly III');
+        View::share('mainTitleIcon', 'fa-fire');
     }
 
     /**
@@ -82,144 +83,74 @@ class HomeController extends Controller
     }
 
     /**
-     * @param TagRepositoryInterface $repository
+     * @param Request $request
      *
      * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
      */
-    public function flush(TagRepositoryInterface $repository)
+    public function flush(Request $request)
     {
-
         Preferences::mark();
-
-        // get all tags.
-        // update all counts:
-        $tags = $repository->get();
-
-        /** @var Tag $tag */
-        foreach ($tags as $tag) {
-            foreach ($tag->transactionjournals()->get() as $journal) {
-                $count              = $journal->tags()->count();
-                $journal->tag_count = $count;
-                $journal->save();
-            }
-        }
-
-
-        Session::clear();
+        $request->session()->forget(['start', 'end', '_previous', 'viewRange', 'range', 'is_custom_range']);
         Artisan::call('cache:clear');
 
         return redirect(route('index'));
     }
 
     /**
-     * @param ARI                  $repository
-     * @param AccountCrudInterface $crud
+     * @param ARI $repository
      *
-     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|\Illuminate\View\View
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|View
      */
-    public function index(ARI $repository, AccountCrudInterface $crud)
+    public function index(ARI $repository)
     {
-
         $types = config('firefly.accountTypesByIdentifier.asset');
-        $count = $repository->countAccounts($types);
+        $count = $repository->count($types);
 
         if ($count == 0) {
             return redirect(route('new-user.index'));
         }
 
-        $title         = 'Firefly';
-        $subTitle      = trans('firefly.welcomeBack');
-        $mainTitleIcon = 'fa-fire';
-        $transactions  = [];
-        $frontPage     = Preferences::get(
-            'frontPageAccounts', $crud->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET])->pluck('id')->toArray()
+        $subTitle     = trans('firefly.welcomeBack');
+        $transactions = [];
+        $frontPage    = Preferences::get(
+            'frontPageAccounts', $repository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET])->pluck('id')->toArray()
         );
         /** @var Carbon $start */
         $start = session('start', Carbon::now()->startOfMonth());
         /** @var Carbon $end */
-        $end               = session('end', Carbon::now()->endOfMonth());
-        $showTour          = Preferences::get('tour', true)->data;
-        $accounts          = $crud->getAccountsById($frontPage->data);
-        $savings           = $repository->getSavingsAccounts($start, $end);
-        $piggyBankAccounts = $repository->getPiggyBankAccounts($start, $end);
+        $end                   = session('end', Carbon::now()->endOfMonth());
+        $showTour              = Preferences::get('tour', true)->data;
+        $accounts              = $repository->getAccountsById($frontPage->data);
+        $showDepositsFrontpage = Preferences::get('showDepositsFrontpage', false)->data;
 
-
-        $savingsTotal = '0';
-        foreach ($savings as $savingAccount) {
-            $savingsTotal = bcadd($savingsTotal, Steam::balance($savingAccount, $end));
-        }
+        // zero bills? Hide some elements from view.
+        /** @var BillRepositoryInterface $billRepository */
+        $billRepository = app(BillRepositoryInterface::class);
+        $billCount      = $billRepository->getBills()->count();
 
         foreach ($accounts as $account) {
-            $set = $repository->journalsInPeriod(new Collection([$account]), [], $start, $end);
-            $set = $set->splice(0, 10);
-
-            if (count($set) > 0) {
-                $transactions[] = [$set, $account];
-            }
+            $collector = app(JournalCollectorInterface::class);
+            $collector->setAccounts(new Collection([$account]))->setRange($start, $end)->setLimit(10)->setPage(1);
+            $set            = $collector->getJournals();
+            $transactions[] = [$set, $account];
         }
 
         return view(
-            'index', compact('count', 'showTour', 'title', 'savings', 'subTitle', 'mainTitleIcon', 'transactions', 'savingsTotal', 'piggyBankAccounts')
+            'index', compact('count', 'showTour', 'title', 'subTitle', 'mainTitleIcon', 'transactions', 'showDepositsFrontpage', 'billCount')
         );
     }
 
     /**
-     * Display a list of named routes. Excludes some that cannot be "shown". This method
-     * is used to generate help files (down the road).
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
      */
-    public function routes()
+    public function testFlash()
     {
-        // these routes are not relevant for the help pages:
-        $ignore = [
-        ];
-        $routes = Route::getRoutes();
-        /** @var \Illuminate\Routing\Route $route */
-        foreach ($routes as $route) {
+        Session::flash('success', 'This is a success message.');
+        Session::flash('info', 'This is an info message.');
+        Session::flash('warning', 'This is a warning.');
+        Session::flash('error', 'This is an error!');
 
-            $name    = $route->getName();
-            $methods = $route->getMethods();
-            $search  = [
-                '{account}', '{what}', '{rule}', '{tj}', '{category}', '{budget}', '{code}', '{date}', '{attachment}', '{bill}', '{limitrepetition}',
-                '{currency}', '{jobKey}', '{piggyBank}', '{ruleGroup}', '{rule}', '{route}', '{unfinishedJournal}',
-                '{reportType}', '{start_date}', '{end_date}', '{accountList}', '{tag}', '{journalList}',
-
-            ];
-            $replace = [1, 'asset', 1, 1, 1, 1, 'abc', '2016-01-01', 1, 1, 1, 1, 1, 1, 1, 1, 'index', 1,
-                        'default', '20160101', '20160131', '1,2', 1, '1,2',
-            ];
-            if (count($search) != count($replace)) {
-                echo 'count';
-                exit;
-            }
-            $url = str_replace($search, $replace, $route->getUri());
-
-            if (!is_null($name) && in_array('GET', $methods) && !$this->startsWithAny($ignore, $name)) {
-                echo '<a href="/' . $url . '" title="' . $name . '">' . $name . '</a><br>' . "\n";
-
-            }
-        }
-
-        return '<hr>';
+        return redirect(route('home'));
     }
 
-
-    /**
-     * @param array  $array
-     * @param string $needle
-     *
-     * @return bool
-     */
-    private
-    function startsWithAny(
-        array $array, string $needle
-    ): bool
-    {
-        foreach ($array as $entry) {
-            if ((substr($needle, 0, strlen($entry)) === $entry)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

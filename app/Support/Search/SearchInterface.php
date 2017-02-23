@@ -3,14 +3,17 @@
  * SearchInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Support\Search;
 
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,38 +24,52 @@ use Illuminate\Support\Collection;
 interface SearchInterface
 {
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @return string
      */
-    public function searchAccounts(array $words): Collection;
+    public function getWordsAsString(): string;
 
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @return bool
      */
-    public function searchBudgets(array $words): Collection;
+    public function hasModifiers(): bool;
 
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @param string $query
      */
-    public function searchCategories(array $words): Collection;
+    public function parseQuery(string $query);
 
     /**
-     *
-     * @param array $words
-     *
      * @return Collection
      */
-    public function searchTags(array $words): Collection;
+    public function searchAccounts(): Collection;
 
     /**
-     * @param array $words
-     *
      * @return Collection
      */
-    public function searchTransactions(array $words): Collection;
+    public function searchBudgets(): Collection;
+
+    /**
+     * @return Collection
+     */
+    public function searchCategories(): Collection;
+
+    /**
+     * @return Collection
+     */
+    public function searchTags(): Collection;
+
+    /**
+     * @return Collection
+     */
+    public function searchTransactions(): Collection;
+
+    /**
+     * @param int $limit
+     */
+    public function setLimit(int $limit);
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 }

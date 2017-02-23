@@ -3,45 +3,51 @@
  * ImportJob.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Models;
 
-use Auth;
 use Crypt;
 use Illuminate\Database\Eloquent\Model;
+use Log;
 use Storage;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-
 /**
- * FireflyIII\Models\ImportJob
+ * Class ImportJob
  *
- * @property integer               $id
- * @property \Carbon\Carbon        $created_at
- * @property \Carbon\Carbon        $updated_at
- * @property integer               $user_id
- * @property string                $key
- * @property string                $file_type
- * @property string                $status
- * @property array                $configuration
- * @property-read \FireflyIII\User $user
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereUserId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereKey($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereFileType($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereStatus($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\ImportJob whereConfiguration($value)
- * @mixin \Eloquent
+ * @package FireflyIII\Models
  */
 class ImportJob extends Model
 {
+
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+        ];
+    /** @var array */
+    protected $dates = ['created_at', 'updated_at'];
+
+    protected $validStatus
+        = [
+            'import_status_never_started', // initial state
+            'import_configuration_saved', // import configuration saved. This step is going to be obsolete.
+            'settings_complete', // aka: ready for import.
+            'import_running', // import currently underway
+            'import_complete', // done with everything
+        ];
 
     /**
      * @param $value
@@ -51,13 +57,37 @@ class ImportJob extends Model
      */
     public static function routeBinder($value)
     {
-        if (Auth::check()) {
-            $model = self::where('key', $value)->where('user_id', Auth::user()->id)->first();
+        if (auth()->check()) {
+            $model = self::where('key', $value)->where('user_id', auth()->user()->id)->first();
             if (!is_null($model)) {
                 return $model;
             }
         }
         throw new NotFoundHttpException;
+    }
+
+    /**
+     * @param int $count
+     */
+    public function addStepsDone(int $count)
+    {
+        $status = $this->extended_status;
+        $status['steps_done'] += $count;
+        $this->extended_status = $status;
+        $this->save();
+
+    }
+
+    /**
+     * @param int $count
+     */
+    public function addTotalSteps(int $count)
+    {
+        $status = $this->extended_status;
+        $status['total_steps'] += $count;
+        $this->extended_status = $status;
+        $this->save();
+
     }
 
     /**
@@ -76,6 +106,23 @@ class ImportJob extends Model
      */
     public function getConfigurationAttribute($value)
     {
+        if (is_null($value)) {
+            return [];
+        }
+        if (strlen($value) == 0) {
+            return [];
+        }
+
+        return json_decode($value, true);
+    }
+
+    /**
+     * @param $value
+     *
+     * @return mixed
+     */
+    public function getExtendedStatusAttribute($value)
+    {
         if (strlen($value) == 0) {
             return [];
         }
@@ -92,6 +139,24 @@ class ImportJob extends Model
     }
 
     /**
+     * @param $value
+     */
+    public function setExtendedStatusAttribute($value)
+    {
+        $this->attributes['extended_status'] = json_encode($value);
+    }
+
+    /**
+     * @param $value
+     */
+    public function setStatusAttribute(string $value)
+    {
+        if (in_array($value, $this->validStatus)) {
+            $this->attributes['status'] = $value;
+        }
+    }
+
+    /**
      * @return string
      */
     public function uploadFileContents(): string
@@ -100,6 +165,7 @@ class ImportJob extends Model
         $disk             = Storage::disk('upload');
         $encryptedContent = $disk->get($fileName);
         $content          = Crypt::decrypt($encryptedContent);
+        Log::debug(sprintf('Content size is %d bytes.', $content));
 
         return $content;
     }

@@ -3,15 +3,16 @@
  * BudgetId.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Import\Converter;
 
-use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Models\Budget;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
 use Log;
@@ -36,11 +37,13 @@ class BudgetId extends BasicConverter implements ConverterInterface
 
         if ($value === 0) {
             $this->setCertainty(0);
+
             return new Budget;
         }
 
         /** @var BudgetRepositoryInterface $repository */
-        $repository = app(BudgetRepositoryInterface::class, [$this->user]);
+        $repository = app(BudgetRepositoryInterface::class);
+        $repository->setUser($this->user);
 
         if (isset($this->mapping[$value])) {
             Log::debug('Found budget in mapping. Should exist.', ['value' => $value, 'map' => $this->mapping[$value]]);
@@ -58,6 +61,7 @@ class BudgetId extends BasicConverter implements ConverterInterface
         if (!is_null($budget->id)) {
             Log::debug('Found budget by ID ', ['id' => $budget->id]);
             $this->setCertainty(100);
+
             return $budget;
         }
 

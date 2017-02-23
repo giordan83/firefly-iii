@@ -1,7 +1,13 @@
 <?php
-declare(strict_types = 1);
-
-
+/**
+ * cache.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
 
 return [
 
@@ -13,6 +19,8 @@ return [
     | This option controls the default cache connection that gets used while
     | using this caching library. This connection is used when another is
     | not explicitly specified when executing a given caching function.
+    |
+    | Supported: "apc", "array", "database", "file", "memcached", "redis"
     |
     */
 
@@ -40,8 +48,8 @@ return [
         ],
 
         'database' => [
-            'driver' => 'database',
-            'table'  => 'cache',
+            'driver'     => 'database',
+            'table'      => 'cache',
             'connection' => null,
         ],
 
@@ -51,16 +59,25 @@ return [
         ],
 
         'memcached' => [
-            'driver'  => 'memcached',
-            'servers' => [
+            'driver'        => 'memcached',
+            'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),
+            'sasl'          => [
+                env('MEMCACHED_USERNAME'),
+                env('MEMCACHED_PASSWORD'),
+            ],
+            'options'       => [
+            ],
+            'servers'       => [
                 [
-                    'host' => '127.0.0.1', 'port' => 11211, 'weight' => 100,
+                    'host'   => env('MEMCACHED_HOST', '127.0.0.1'),
+                    'port'   => env('MEMCACHED_PORT', 11211),
+                    'weight' => 100,
                 ],
             ],
         ],
 
         'redis' => [
-            'driver' => 'redis',
+            'driver'     => 'redis',
             'connection' => 'default',
         ],
 
@@ -77,6 +94,6 @@ return [
     |
     */
 
-    'prefix' => 'firefly',
+    'prefix' => env('CACHE_PREFIX', 'firefly'),
 
 ];

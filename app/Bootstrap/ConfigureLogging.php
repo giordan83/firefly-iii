@@ -3,8 +3,10 @@
  * ConfigureLogging.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -22,24 +24,40 @@ use Illuminate\Log\Writer;
  */
 class ConfigureLogging extends IlluminateConfigureLogging
 {
+
     /**
-     * @param Application $app
-     * @param Writer      $log
+     * Configure the Monolog handlers for the application.
+     *
+     * @param  \Illuminate\Contracts\Foundation\Application $app
+     * @param  \Illuminate\Log\Writer                       $log
+     *
+     * @return void
      */
     protected function configureDailyHandler(Application $app, Writer $log)
     {
+        $config = $app->make('config');
+
+        $maxFiles = $config->get('app.log_max_files');
+
         $log->useDailyFiles(
-            $app->storagePath() . '/logs/firefly-iii.log',
-            $app->make('config')->get('app.log_max_files', 5)
+            $app->storagePath() . '/logs/firefly-iii.log', is_null($maxFiles) ? 5 : $maxFiles,
+            $config->get('app.log_level', 'debug')
         );
     }
 
     /**
-     * @param Application $app
-     * @param Writer      $log
+     * Configure the Monolog handlers for the application.
+     *
+     * @param  \Illuminate\Contracts\Foundation\Application $app
+     * @param  \Illuminate\Log\Writer                       $log
+     *
+     * @return void
      */
     protected function configureSingleHandler(Application $app, Writer $log)
     {
-        $log->useFiles($app->storagePath() . '/logs/firefly-iii.log');
+        $log->useFiles(
+            $app->storagePath() . '/logs/firefly-iii.log',
+            $app->make('config')->get('app.log_level', 'debug')
+        );
     }
 }

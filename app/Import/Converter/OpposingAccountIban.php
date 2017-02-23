@@ -3,16 +3,19 @@
  * OpposingAccountIban.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Import\Converter;
 
-use FireflyIII\Crud\Account\AccountCrudInterface;
+use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Models\Account;
+use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use Log;
 
 /**
@@ -35,11 +38,13 @@ class OpposingAccountIban extends BasicConverter implements ConverterInterface
 
         if (strlen($value) === 0) {
             $this->setCertainty(0);
+
             return new Account;
         }
 
-        /** @var AccountCrudInterface $repository */
-        $repository = app(AccountCrudInterface::class, [$this->user]);
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
+        $repository->setUser($this->user);
 
 
         if (isset($this->mapping[$value])) {
@@ -48,6 +53,7 @@ class OpposingAccountIban extends BasicConverter implements ConverterInterface
             if (!is_null($account->id)) {
                 Log::debug('Found account by ID', ['id' => $account->id]);
                 $this->setCertainty(100);
+
                 return $account;
             }
         }
@@ -56,7 +62,7 @@ class OpposingAccountIban extends BasicConverter implements ConverterInterface
         $account = $repository->findByIban($value, []);
         if (!is_null($account->id)) {
             Log::debug('Found account by IBAN', ['id' => $account->id]);
-            Log::notice(
+            Log::info(
                 'The match between IBAN and account is uncertain because the type of transactions may not have been determined.',
                 ['id' => $account->id, 'iban' => $value]
             );
@@ -65,11 +71,20 @@ class OpposingAccountIban extends BasicConverter implements ConverterInterface
             return $account;
         }
 
-        $account = $repository->store(
-            ['name'           => $value, 'iban' => $value, 'user' => $this->user->id, 'accountType' => 'import', 'virtualBalance' => 0, 'active' => true,
-             'openingBalance' => 0]
-        );
-        $this->setCertainty(100);
+        // the IBAN given may not be a valid IBAN. If not, we cannot store by
+        // iban and we have no opposing account. There should be some kind of fall back
+        // routine.
+        try {
+            $account = $repository->store(
+                ['name'           => $value, 'iban' => $value, 'user' => $this->user->id, 'accountType' => 'import', 'virtualBalance' => 0, 'active' => true,
+                 'openingBalance' => 0]
+            );
+            $this->setCertainty(100);
+        } catch (FireflyException $e) {
+            Log::error($e);
+
+            $account = new Account;
+        }
 
         return $account;
     }

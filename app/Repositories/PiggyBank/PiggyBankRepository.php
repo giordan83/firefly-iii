@@ -3,8 +3,10 @@
  * PiggyBankRepository.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -13,6 +15,7 @@ namespace FireflyIII\Repositories\PiggyBank;
 
 use Amount;
 use Carbon\Carbon;
+use FireflyIII\Models\Note;
 use FireflyIII\Models\PiggyBank;
 use FireflyIII\Models\PiggyBankEvent;
 use FireflyIII\User;
@@ -28,16 +31,6 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
 
     /** @var User */
     private $user;
-
-    /**
-     * PiggyBankRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @param PiggyBank $piggyBank
@@ -114,11 +107,12 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
      *
      * @return Collection
      */
-    public function getPiggyBanksWithAmount() : Collection
+    public function getPiggyBanksWithAmount(): Collection
     {
         $set = $this->getPiggyBanks();
         foreach ($set as $piggy) {
-            $piggy->name = $piggy->name . ' (' . Amount::format($piggy->currentRelevantRep()->currentamount, false) . ')';
+            $currentAmount = $piggy->currentRelevantRep()->currentamount ?? '0';
+            $piggy->name   = $piggy->name . ' (' . Amount::format($currentAmount, false) . ')';
         }
 
         return $set;
@@ -132,8 +126,7 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     public function reset(): bool
     {
         // split query to make it work in sqlite:
-        $set = PiggyBank::
-        leftJoin('accounts', 'accounts.id', '=', 'piggy_banks.id')
+        $set = PiggyBank::leftJoin('accounts', 'accounts.id', '=', 'piggy_banks.id')
                         ->where('accounts.user_id', $this->user->id)->get(['piggy_banks.*']);
         foreach ($set as $e) {
             $e->order = 0;
@@ -165,13 +158,24 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return PiggyBank
      */
     public function store(array $data): PiggyBank
     {
-        $piggyBank = PiggyBank::create($data);
+        $data['order'] = $this->getMaxOrder() + 1;
+        $piggyBank     = PiggyBank::create($data);
+
+        $this->updateNote($piggyBank, $data['note']);
 
         return $piggyBank;
     }
@@ -193,14 +197,47 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
 
         $piggyBank->save();
 
+        $this->updateNote($piggyBank, $data['note']);
+
         // if the piggy bank is now smaller than the current relevant rep,
         // remove money from the rep.
         $repetition = $piggyBank->currentRelevantRep();
         if ($repetition->currentamount > $piggyBank->targetamount) {
+
+            $diff = bcsub($piggyBank->targetamount, $repetition->currentamount);
+            $this->createEvent($piggyBank, $diff);
+
             $repetition->currentamount = $piggyBank->targetamount;
             $repetition->save();
         }
 
         return $piggyBank;
+    }
+
+    /**
+     * @param PiggyBank $piggyBank
+     * @param string    $note
+     *
+     * @return bool
+     */
+    private function updateNote(PiggyBank $piggyBank, string $note): bool
+    {
+        if (strlen($note) === 0) {
+            $dbNote = $piggyBank->notes()->first();
+            if (!is_null($dbNote)) {
+                $dbNote->delete();
+            }
+
+            return true;
+        }
+        $dbNote = $piggyBank->notes()->first();
+        if (is_null($dbNote)) {
+            $dbNote = new Note();
+            $dbNote->noteable()->associate($piggyBank);
+        }
+        $dbNote->text = trim($note);
+        $dbNote->save();
+
+        return true;
     }
 }

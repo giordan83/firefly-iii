@@ -3,8 +3,10 @@
  * BasicCollector.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -25,33 +27,38 @@ class BasicCollector
     /** @var ExportJob */
     protected $job;
     /** @var Collection */
-    private $files;
+    private $entries;
 
     /**
      * BasicCollector constructor.
-     *
-     * @param ExportJob $job
      */
-    public function __construct(ExportJob $job)
+    public function __construct()
     {
-        $this->files = new Collection;
-        $this->job   = $job;
+        $this->entries = new Collection;
     }
 
     /**
      * @return Collection
      */
-    public function getFiles(): Collection
+    public function getEntries(): Collection
     {
-        return $this->files;
+        return $this->entries;
     }
 
     /**
-     * @param Collection $files
+     * @param Collection $entries
      */
-    public function setFiles(Collection $files)
+    public function setEntries(Collection $entries)
     {
-        $this->files = $files;
+        $this->entries = $entries;
+    }
+
+    /**
+     * @param ExportJob $job
+     */
+    public function setJob(ExportJob $job)
+    {
+        $this->job = $job;
     }
 
 

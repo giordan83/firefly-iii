@@ -3,23 +3,21 @@
  * AttachmentHelper.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 namespace FireflyIII\Helpers\Attachments;
 
-use Auth;
 use Crypt;
 use FireflyIII\Models\Attachment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\MessageBag;
-use Input;
-use Log;
 use Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use TypeError;
 
 /**
  * Class AttachmentHelper
@@ -34,9 +32,9 @@ class AttachmentHelper implements AttachmentHelperInterface
     /** @var MessageBag */
     public $messages;
     /** @var array */
-    protected $allowedMimes;
+    protected $allowedMimes = [];
     /** @var int */
-    protected $maxUploadSize;
+    protected $maxUploadSize = 0;
 
     /** @var \Illuminate\Contracts\Filesystem\Filesystem */
     protected $uploadDisk;
@@ -46,8 +44,8 @@ class AttachmentHelper implements AttachmentHelperInterface
      */
     public function __construct()
     {
-        $this->maxUploadSize = config('firefly.maxUploadSize');
-        $this->allowedMimes  = config('firefly.allowedMimes');
+        $this->maxUploadSize = intval(config('firefly.maxUploadSize'));
+        $this->allowedMimes  = (array)config('firefly.allowedMimes');
         $this->errors        = new MessageBag;
         $this->messages      = new MessageBag;
         $this->uploadDisk    = Storage::disk('upload');
@@ -60,7 +58,7 @@ class AttachmentHelper implements AttachmentHelperInterface
      */
     public function getAttachmentLocation(Attachment $attachment): string
     {
-        $path = storage_path('upload') . DIRECTORY_SEPARATOR . 'at-' . $attachment->id . '.data';
+        $path = sprintf('%s%sat-%d.data', storage_path('upload'), DIRECTORY_SEPARATOR, intval($attachment->id));
 
         return $path;
     }
@@ -82,20 +80,19 @@ class AttachmentHelper implements AttachmentHelperInterface
     }
 
     /**
-     * @param Model $model
+     * @param Model      $model
+     * @param array|null $files
      *
      * @return bool
      */
-    public function saveAttachmentsForModel(Model $model): bool
+    public function saveAttachmentsForModel(Model $model, array $files = null): bool
     {
-        $files = $this->getFiles();
-
-        if (!is_null($files) && !is_array($files)) {
-            $this->processFile($files, $model);
-        }
-
         if (is_array($files)) {
-            $this->processFiles($files, $model);
+            foreach ($files as $entry) {
+                if (!is_null($entry)) {
+                    $this->processFile($entry, $model);
+                }
+            }
         }
 
         return true;
@@ -112,7 +109,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         $md5   = md5_file($file->getRealPath());
         $name  = $file->getClientOriginalName();
         $class = get_class($model);
-        $count = Auth::user()->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
+        $count = auth()->user()->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
 
         if ($count > 0) {
             $msg = (string)trans('validation.file_already_attached', ['name' => $name]);
@@ -139,7 +136,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         }
 
         $attachment = new Attachment; // create Attachment object.
-        $attachment->user()->associate(Auth::user());
+        $attachment->user()->associate(auth()->user());
         $attachment->attachable()->associate($model);
         $attachment->md5      = md5_file($file->getRealPath());
         $attachment->filename = $file->getClientOriginalName();
@@ -228,40 +225,4 @@ class AttachmentHelper implements AttachmentHelperInterface
 
         return true;
     }
-
-    /**
-     * @return array|null|UploadedFile
-     */
-    private function getFiles()
-    {
-        $files = null;
-        try {
-            if (Input::hasFile('attachments')) {
-                $files = Input::file('attachments');
-            }
-        } catch (TypeError $e) {
-            // Log it, do nothing else.
-            Log::error($e->getMessage());
-        }
-
-        return $files;
-    }
-
-    /**
-     * @param array $files
-     *
-     * @return bool
-     */
-    private function processFiles(array $files, Model $model): bool
-    {
-        foreach ($files as $entry) {
-            if (!is_null($entry)) {
-                $this->processFile($entry, $model);
-            }
-        }
-
-        return true;
-    }
-
-
 }

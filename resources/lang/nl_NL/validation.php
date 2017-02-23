@@ -3,13 +3,16 @@
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 return [
     'iban'                           => 'Dit is niet een geldige IBAN.',
     'unique_account_number_for_user' => 'Het lijkt erop dat dit rekeningnummer al in gebruik is.',
+    'deleted_user'                   => 'Je kan je niet registreren met dit e-mailadres.',
     'rule_trigger_value'             => 'Deze waarde is niet geldig voor de geselecteerde trigger.',
     'rule_action_value'              => 'Deze waarde is niet geldig voor de geselecteerde actie.',
     'invalid_domain'                 => 'Kan niet registereren vanaf dit domein.',
@@ -19,6 +22,8 @@ return [
     'file_too_large'                 => 'Bestand ":name" is te groot.',
     'belongs_to_user'                => 'De waarde van :attribute is onbekend',
     'accepted'                       => ':attribute moet geaccepteerd zijn.',
+    'bic'                            => 'Dit is geen geldige BIC.',
+    'more'                           => ':attribute moet groter zijn dan nul.',
     'active_url'                     => ':attribute is geen geldige URL.',
     'after'                          => ':attribute moet een datum na :date zijn.',
     'alpha'                          => ':attribute mag alleen letters bevatten.',
@@ -77,4 +82,10 @@ return [
     'url'                            => ':attribute is geen geldige URL.',
     'timezone'                       => 'Het :attribute moet een geldige zone zijn.',
     '2fa_code'                       => 'De waarde in het :attribute-veld is niet geldig.',
+    'dimensions'                     => 'Het :attribute heeft het verkeerde afbeeldingsformaat.',
+    'distinct'                       => 'Het :attribute veld heeft een dubbele waarde.',
+    'file'                           => ':attribute moet een bestand zijn.',
+    'in_array'                       => 'Het :attribute veld bestaat niet in :other.',
+    'present'                        => 'Het :attribute veld moet aanwezig zijn.',
+    'amount_zero'                    => 'Het totaalbedrag kan niet nul zijn',
 ];

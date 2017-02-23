@@ -3,8 +3,10 @@
  * ReportController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -15,7 +17,9 @@ namespace FireflyIII\Http\Controllers\Popup;
 use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Helpers\Collection\BalanceLine;
+use FireflyIII\Helpers\Collector\JournalCollectorInterface;
 use FireflyIII\Http\Controllers\Controller;
+use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
@@ -42,7 +46,7 @@ class ReportController extends Controller
      * @return \Illuminate\Http\JsonResponse
      * @throws FireflyException
      */
-    public function info(Request $request)
+    public function general(Request $request)
     {
         $attributes = $request->get('attributes') ?? [];
         $attributes = $this->parseAttributes($attributes);
@@ -89,29 +93,54 @@ class ReportController extends Controller
         /** @var BudgetRepositoryInterface $budgetRepository */
         $budgetRepository = app(BudgetRepositoryInterface::class);
         $budget           = $budgetRepository->find(intval($attributes['budgetId']));
-        $crud             = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $account          = $crud->find(intval($attributes['accountId']));
+
+        /** @var AccountRepositoryInterface $repository */
+        $repository = app(AccountRepositoryInterface::class);
+
+        $account = $repository->find(intval($attributes['accountId']));
+        $types   = [TransactionType::WITHDRAWAL];
 
         switch (true) {
             case ($role === BalanceLine::ROLE_DEFAULTROLE && !is_null($budget->id)):
-                $journals = $budgetRepository->journalsInPeriod(
-                    new Collection([$budget]), new Collection([$account]), $attributes['startDate'], $attributes['endDate']
-                );
+                /** @var JournalCollectorInterface $collector */
+                $collector = app(JournalCollectorInterface::class);
+                $collector
+                    ->setAccounts(new Collection([$account]))
+                    ->setRange($attributes['startDate'], $attributes['endDate'])
+                    ->setBudget($budget);
+                $journals = $collector->getJournals();
+
                 break;
             case ($role === BalanceLine::ROLE_DEFAULTROLE && is_null($budget->id)):
                 $budget->name = strval(trans('firefly.no_budget'));
-                $journals     = $budgetRepository->journalsInPeriodWithoutBudget($attributes['accounts'], $attributes['startDate'], $attributes['endDate']);
+                /** @var JournalCollectorInterface $collector */
+                $collector = app(JournalCollectorInterface::class);
+                $collector
+                    ->setAccounts(new Collection([$account]))
+                    ->setTypes($types)
+                    ->setRange($attributes['startDate'], $attributes['endDate'])
+                    ->withoutBudget();
+                $journals = $collector->getJournals();
                 break;
             case ($role === BalanceLine::ROLE_DIFFROLE):
-                // journals no budget, not corrected by a tag.
-                $journals     = $budgetRepository->journalsInPeriodWithoutBudget($attributes['accounts'], $attributes['startDate'], $attributes['endDate']);
+                /** @var JournalCollectorInterface $collector */
+                $collector = app(JournalCollectorInterface::class);
+                $collector
+                    ->setAccounts(new Collection([$account]))
+                    ->setTypes($types)
+                    ->setRange($attributes['startDate'], $attributes['endDate'])
+                    ->withoutBudget();
+                $journals = $collector->getJournals();
+
                 $budget->name = strval(trans('firefly.leftUnbalanced'));
                 $journals     = $journals->filter(
-                    function (TransactionJournal $journal) {
-                        $tags = $journal->tags()->where('tagMode', 'balancingAct')->count();
+                    function (Transaction $transaction) {
+                        $tags = $transaction->transactionJournal->tags()->where('tagMode', 'balancingAct')->count();
                         if ($tags === 0) {
-                            return $journal;
+                            return true;
                         }
+
+                        return false;
                     }
                 );
                 break;
@@ -139,14 +168,22 @@ class ReportController extends Controller
         /** @var BudgetRepositoryInterface $repository */
         $repository = app(BudgetRepositoryInterface::class);
         $budget     = $repository->find(intval($attributes['budgetId']));
-        if (is_null($budget->id)) {
-            $journals = $repository->journalsInPeriodWithoutBudget($attributes['accounts'], $attributes['startDate'], $attributes['endDate']);
-        } else {
-            // get all expenses in budget in period:
-            $journals = $repository->journalsInPeriod(new Collection([$budget]), $attributes['accounts'], $attributes['startDate'], $attributes['endDate']);
-        }
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
 
-        $view = view('popup.report.budget-spent-amount', compact('journals', 'budget'))->render();
+        $collector
+            ->setAccounts($attributes['accounts'])
+            ->setRange($attributes['startDate'], $attributes['endDate']);
+
+        if (is_null($budget->id)) {
+            $collector->setTypes([TransactionType::WITHDRAWAL])->withoutBudget();
+        }
+        if (!is_null($budget->id)) {
+            // get all expenses in budget in period:
+            $collector->setBudget($budget);
+        }
+        $journals = $collector->getJournals();
+        $view     = view('popup.report.budget-spent-amount', compact('journals', 'budget'))->render();
 
         return $view;
     }
@@ -164,8 +201,15 @@ class ReportController extends Controller
         /** @var CategoryRepositoryInterface $repository */
         $repository = app(CategoryRepositoryInterface::class);
         $category   = $repository->find(intval($attributes['categoryId']));
-        $journals   = $repository->journalsInPeriod(new Collection([$category]), $attributes['accounts'], [], $attributes['startDate'], $attributes['endDate']);
-        $view       = view('popup.report.category-entry', compact('journals', 'category'))->render();
+        $types      = [TransactionType::WITHDRAWAL, TransactionType::TRANSFER];
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAccounts($attributes['accounts'])->setTypes($types)
+                  ->setRange($attributes['startDate'], $attributes['endDate'])
+                  ->setCategory($category);
+        $journals = $collector->getJournals(); // 7193
+
+        $view = view('popup.report.category-entry', compact('journals', 'category'))->render();
 
         return $view;
     }
@@ -182,17 +226,23 @@ class ReportController extends Controller
     {
         /** @var AccountRepositoryInterface $repository */
         $repository = app(AccountRepositoryInterface::class);
-        $crud       = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $account    = $crud->find(intval($attributes['accountId']));
-        $types      = [TransactionType::WITHDRAWAL, TransactionType::TRANSFER];
-        $journals   = $repository->journalsInPeriod($attributes['accounts'], $types, $attributes['startDate'], $attributes['endDate']);
+
+        $account = $repository->find(intval($attributes['accountId']));
+        $types   = [TransactionType::WITHDRAWAL, TransactionType::TRANSFER];
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAccounts(new Collection([$account]))->setRange($attributes['startDate'], $attributes['endDate'])->setTypes($types);
+        $journals = $collector->getJournals();
+        $report   = $attributes['accounts']->pluck('id')->toArray(); // accounts used in this report
 
         // filter for transfers and withdrawals TO the given $account
         $journals = $journals->filter(
-            function (TransactionJournal $journal) use ($account) {
-                if ($journal->destination_account_id === $account->id) {
-                    return $journal;
-                }
+            function (Transaction $transaction) use ($report) {
+                // get the destinations:
+                $sources = TransactionJournal::sourceAccountList($transaction->transactionJournal)->pluck('id')->toArray();
+
+                // do these intersect with the current list?
+                return !empty(array_intersect($report, $sources));
             }
         );
 
@@ -212,21 +262,23 @@ class ReportController extends Controller
     private function incomeEntry(array $attributes): string
     {
         /** @var AccountRepositoryInterface $repository */
-        $repository   = app(AccountRepositoryInterface::class);
-        $crud         = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $account      = $crud->find(intval($attributes['accountId']));
-        $types        = [TransactionType::DEPOSIT, TransactionType::TRANSFER];
-        $journals     = $repository->journalsInPeriod(new Collection([$account]), $types, $attributes['startDate'], $attributes['endDate']);
-        $destinations = $attributes['accounts']->pluck('id')->toArray();
-        // filter for transfers and withdrawals FROM the given $account
+        $repository = app(AccountRepositoryInterface::class);
+        $account    = $repository->find(intval($attributes['accountId']));
+        $types      = [TransactionType::DEPOSIT, TransactionType::TRANSFER];
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAccounts(new Collection([$account]))->setRange($attributes['startDate'], $attributes['endDate'])->setTypes($types);
+        $journals = $collector->getJournals();
+        $report   = $attributes['accounts']->pluck('id')->toArray(); // accounts used in this report
+
+        // filter the set so the destinations outside of $attributes['accounts'] are not included.
         $journals = $journals->filter(
-            function (TransactionJournal $journal) use ($account, $destinations) {
-                if (
-                    $journal->source_account_id === $account->id
-                    && in_array($journal->destination_account_id, $destinations)
-                ) {
-                    return $journal;
-                }
+            function (Transaction $transaction) use ($report) {
+                // get the destinations:
+                $destinations = TransactionJournal::destinationAccountList($transaction->transactionJournal)->pluck('id')->toArray();
+
+                // do these intersect with the current list?
+                return !empty(array_intersect($report, $destinations));
             }
         );
 

@@ -3,19 +3,22 @@
  * JournalRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Repositories\Journal;
 
-use Carbon\Carbon;
-use FireflyIII\Models\Transaction;
+use FireflyIII\Models\Account;
 use FireflyIII\Models\TransactionJournal;
-use Illuminate\Pagination\LengthAwarePaginator;
+use FireflyIII\Models\TransactionType;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\MessageBag;
 
 /**
  * Interface JournalRepositoryInterface
@@ -25,13 +28,14 @@ use Illuminate\Support\Collection;
 interface JournalRepositoryInterface
 {
     /**
-     * Returns the amount in the account before the specified transaction took place.
+     * @param TransactionJournal $journal
+     * @param TransactionType    $type
+     * @param Account            $source
+     * @param Account            $destination
      *
-     * @param Transaction $transaction
-     *
-     * @return string
+     * @return MessageBag
      */
-    public function balanceBeforeTransaction(Transaction $transaction): string;
+    public function convert(TransactionJournal $journal, TransactionType $type, Account $source, Account $destination): MessageBag;
 
     /**
      * Deletes a journal.
@@ -49,7 +53,7 @@ interface JournalRepositoryInterface
      *
      * @return TransactionJournal
      */
-    public function find(int $journalId) : TransactionJournal;
+    public function find(int $journalId): TransactionJournal;
 
     /**
      * Get users very first transaction journal
@@ -59,40 +63,14 @@ interface JournalRepositoryInterface
     public function first(): TransactionJournal;
 
     /**
-     * Returns a page of a specific type(s) of journal.
-     *
-     * @param array $types
-     * @param int   $page
-     * @param int   $pageSize
-     *
-     * @return LengthAwarePaginator
-     */
-    public function getJournals(array $types, int $page, int $pageSize = 50): LengthAwarePaginator;
-
-    /**
-     * Returns a collection of ALL journals, given a specific account and a date range.
-     *
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
      * @return Collection
      */
-    public function getJournalsInRange(Collection $accounts, Carbon $start, Carbon $end): Collection;
+    public function getTransactionTypes(): Collection;
 
     /**
-     * @param TransactionJournal $journal
-     *
-     * @return Collection
+     * @param User $user
      */
-    public function getPiggyBankEvents(TransactionJournal $journal): Collection;
-
-    /**
-     * @param TransactionJournal $journal
-     *
-     * @return Collection
-     */
-    public function getTransactions(TransactionJournal $journal): Collection;
+    public function setUser(User $user);
 
     /**
      * @param array $data
@@ -102,13 +80,12 @@ interface JournalRepositoryInterface
     public function store(array $data): TransactionJournal;
 
     /**
-     * Store journal only, uncompleted, with attachments if necessary.
-     *
-     * @param array $data
+     * @param TransactionJournal $journal
+     * @param array              $data
      *
      * @return TransactionJournal
      */
-    public function storeJournal(array $data): TransactionJournal;
+    public function update(TransactionJournal $journal, array $data): TransactionJournal;
 
     /**
      * @param TransactionJournal $journal
@@ -116,6 +93,6 @@ interface JournalRepositoryInterface
      *
      * @return TransactionJournal
      */
-    public function update(TransactionJournal $journal, array $data): TransactionJournal;
+    public function updateSplitJournal(TransactionJournal $journal, array $data): TransactionJournal;
 
 }

@@ -3,59 +3,48 @@
  * Tag.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Models;
 
-use Auth;
 use Crypt;
 use FireflyIII\Support\Models\TagSupport;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Watson\Validating\ValidatingTrait;
 
 /**
- * FireflyIII\Models\Tag
+ * Class Tag
  *
- * @property integer                                                            $id
- * @property \Carbon\Carbon                                                     $created_at
- * @property \Carbon\Carbon                                                     $updated_at
- * @property string                                                             $deleted_at
- * @property integer                                                            $user_id
- * @property string                                                             $tag
- * @property string                                                             $tagMode
- * @property \Carbon\Carbon                                                     $date
- * @property string                                                             $description
- * @property float                                                              $latitude
- * @property float                                                              $longitude
- * @property integer                                                            $zoomLevel
- * @property-read \Illuminate\Database\Eloquent\Collection|TransactionJournal[] $transactionjournals
- * @property-read \FireflyIII\User                                              $user
- * @property int                                                                $account_id
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereDeletedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereUserId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereTag($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereTagMode($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereDate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereDescription($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereLatitude($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereLongitude($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Tag whereZoomLevel($value)
- * @mixin \Eloquent
+ * @package FireflyIII\Models
  */
 class Tag extends TagSupport
 {
-    protected $dates    = ['created_at', 'updated_at', 'date'];
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+                        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+            'deleted_at' => 'date',
+            'date'       => 'date',
+            'zoomLevel'  => 'int',
+
+        ];
+    protected $dates    = ['created_at', 'updated_at', 'date', 'deleted_at'];
     protected $fillable = ['user_id', 'tag', 'date', 'description', 'longitude', 'latitude', 'zoomLevel', 'tagMode'];
     protected $rules    = ['tag' => 'required|between:1,200',];
 
-    use ValidatingTrait;
+    use ValidatingTrait, SoftDeletes;
 
     /**
      * @param array $fields
@@ -69,7 +58,7 @@ class Tag extends TagSupport
         $search = $fields;
         unset($search['tag']);
 
-        $query = Tag::orderBy('id');
+        $query = self::orderBy('id');
         foreach ($search as $name => $value) {
             $query->where($name, $value);
         }
@@ -83,7 +72,7 @@ class Tag extends TagSupport
         // create it!
         $fields['tagMode']     = 'nothing';
         $fields['description'] = $fields['description'] ?? '';
-        $tag                   = Tag::create($fields);
+        $tag                   = self::create($fields);
 
         return $tag;
 
@@ -96,8 +85,8 @@ class Tag extends TagSupport
      */
     public static function routeBinder(Tag $value)
     {
-        if (Auth::check()) {
-            if ($value->user_id == Auth::user()->id) {
+        if (auth()->check()) {
+            if ($value->user_id == auth()->user()->id) {
                 return $value;
             }
         }
@@ -155,7 +144,7 @@ class Tag extends TagSupport
      */
     public function save(array $options = [])
     {
-        foreach ($this->transactionjournals()->get() as $journal) {
+        foreach ($this->transactionJournals()->get() as $journal) {
             $count              = $journal->tags()->count();
             $journal->tag_count = $count;
             $journal->save();
@@ -185,7 +174,7 @@ class Tag extends TagSupport
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
-    public function transactionjournals()
+    public function transactionJournals()
     {
         return $this->belongsToMany('FireflyIII\Models\TransactionJournal');
     }

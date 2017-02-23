@@ -3,16 +3,20 @@
  * TagRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Repositories\Tag;
 
+use Carbon\Carbon;
 use FireflyIII\Models\Tag;
 use FireflyIII\Models\TransactionJournal;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 
@@ -43,18 +47,34 @@ interface TagRepositoryInterface
     public function destroy(Tag $tag): bool;
 
     /**
-     * @param string $tag
+     * @param Tag    $tag
+     * @param Carbon $start
+     * @param Carbon $end
      *
-     * @return Tag
+     * @return string
      */
-    public function findByTag(string $tag) : Tag;
+    public function earnedInPeriod(Tag $tag, Carbon $start, Carbon $end): string;
 
     /**
      * @param int $tagId
      *
      * @return Tag
      */
-    public function find(int $tagId) : Tag;
+    public function find(int $tagId): Tag;
+
+    /**
+     * @param string $tag
+     *
+     * @return Tag
+     */
+    public function findByTag(string $tag): Tag;
+
+    /**
+     * @param Tag $tag
+     *
+     * @return Carbon
+     */
+    public function firstUseDate(Tag $tag): Carbon;
 
     /**
      * This method returns all the user's tags.
@@ -62,6 +82,27 @@ interface TagRepositoryInterface
      * @return Collection
      */
     public function get(): Collection;
+
+    /**
+     * @param Tag $tag
+     *
+     * @return Carbon
+     */
+    public function lastUseDate(Tag $tag): Carbon;
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
+
+    /**
+     * @param Tag    $tag
+     * @param Carbon $start
+     * @param Carbon $end
+     *
+     * @return string
+     */
+    public function spentInPeriod(Tag $tag, Carbon $start, Carbon $end): string;
 
     /**
      * This method stores a tag.

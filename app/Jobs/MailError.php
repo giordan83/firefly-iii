@@ -3,8 +3,10 @@
  * MailError.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -76,10 +78,10 @@ class MailError extends Job implements ShouldQueue
                 $args['ip']       = $this->ipAddress;
 
                 Mail::send(
-                    ['emails.error-html', 'emails.error'], $args,
+                    ['emails.error-html', 'emails.error-text'], $args,
                     function (Message $message) use ($email) {
                         if ($email != 'mail@example.com') {
-                            $message->to($email, $email)->subject('Caught an error in Firely III.');
+                            $message->to($email, $email)->subject('Caught an error in Firely III');
                         }
                     }
                 );

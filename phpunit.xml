@@ -7,16 +7,24 @@
          convertNoticesToExceptions="true"
          convertWarningsToExceptions="true"
          processIsolation="false"
+         beStrictAboutOutputDuringTests="true"
          stopOnFailure="true">
     <testsuites>
-        <testsuite name="Application Test Suite">
-            <directory>./tests/</directory>
+        <testsuite name="Feature Tests">
+            <directory suffix="Test.php">./tests/Feature</directory>
+        </testsuite>
+
+        <testsuite name="Unit Tests">
+            <directory suffix="Test.php">./tests/Unit</directory>
         </testsuite>
     </testsuites>
     <filter>
-        <whitelist>
-            <directory suffix=".php">app/</directory>
+        <whitelist addUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">./app</directory>
         </whitelist>
+        <blacklist>
+            <directory>vendor/</directory>
+        </blacklist>
     </filter>
     <php>
         <env name="APP_ENV" value="testing"/>
@@ -24,8 +32,4 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_DRIVER" value="sync"/>
     </php>
-
-    <listeners>
-        <listener class="JohnKary\PHPUnit\Listener\SpeedTrapListener" />
-    </listeners>
 </phpunit>

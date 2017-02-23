@@ -4,12 +4,12 @@
         <div class="modal-header">
             <button type="button" class="close" data-dismiss="modal" aria-label="{{ 'close'|_ }}"><span aria-hidden="true">&times;</span></button>
             <h4 class="modal-title" id="budgetSpentAmountLabel">
-                {{ trans('firefly.budget_spent_amount', {start: start.formatLocalized(monthAndDayFormat), end: end.formatLocalized(monthAndDayFormat), budget: budget.name})}}
+                {{ trans('firefly.budget_spent_amount', {start: start.formatLocalized(monthAndDayFormat), end: end.formatLocalized(monthAndDayFormat), budget: budget.name}) }}
             </h4>
         </div>
         <div class="modal-body">
             {% set hideBudget = true %}
-            {% include 'popup/list/journals.twig' %}
+            {% include 'popup/list/journals-tasker' %}
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-default" data-dismiss="modal">{{ 'close'|_ }}</button>

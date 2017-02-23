@@ -3,17 +3,16 @@
  * TagFormRequest.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 namespace FireflyIII\Http\Requests;
 
-use Auth;
-use Carbon\Carbon;
-use FireflyIII\Models\Tag;
-use Input;
+use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 
 /**
  * Class TagFormRequest
@@ -29,18 +28,18 @@ class TagFormRequest extends Request
     public function authorize()
     {
         // Only allow logged in users
-        return Auth::check();
+        return auth()->check();
     }
 
     /**
      * @return array
      */
-    public function collectTagData() :array
+    public function collectTagData(): array
     {
-        if (Input::get('setTag') == 'true') {
-            $latitude  = $this->get('latitude');
-            $longitude = $this->get('longitude');
-            $zoomLevel = $this->get('zoomLevel');
+        if ($this->get('setTag') == 'true') {
+            $latitude  = $this->string('latitude');
+            $longitude = $this->string('longitude');
+            $zoomLevel = $this->integer('zoomLevel');
         } else {
             $latitude  = null;
             $longitude = null;
@@ -49,13 +48,13 @@ class TagFormRequest extends Request
         $date = $this->get('date') ?? '';
 
         $data = [
-            'tag'         => $this->get('tag'),
-            'date'        => strlen($date) > 0 ? new Carbon($date) : null,
-            'description' => $this->get('description') ?? '',
+            'tag'         => $this->string('tag'),
+            'date'        => $this->date($date),
+            'description' => $this->string('description'),
             'latitude'    => $latitude,
             'longitude'   => $longitude,
             'zoomLevel'   => $zoomLevel,
-            'tagMode'     => $this->get('tagMode'),
+            'tagMode'     => $this->string('tagMode'),
         ];
 
         return $data;
@@ -68,11 +67,13 @@ class TagFormRequest extends Request
      */
     public function rules()
     {
-        $idRule  = '';
-        $tagRule = 'required|min:1|uniqueObjectForUser:tags,tag';
-        if (Tag::find(Input::get('id'))) {
+        /** @var TagRepositoryInterface $repository */
+        $repository = app(TagRepositoryInterface::class);
+        $idRule     = '';
+        $tagRule    = 'required|min:1|uniqueObjectForUser:tags,tag';
+        if (!is_null($repository->find(intval($this->get('id')))->id)) {
             $idRule  = 'belongsToUser:tags';
-            $tagRule = 'required|min:1|uniqueObjectForUser:tags,tag,' . Input::get('id');
+            $tagRule = 'required|min:1|uniqueObjectForUser:tags,tag,' . $this->get('id');
         }
 
         return [

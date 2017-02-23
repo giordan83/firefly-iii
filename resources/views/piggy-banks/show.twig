@@ -1,4 +1,4 @@
-{% extends "./layout/default.twig" %}
+{% extends "./layout/default" %}
 
 {% block breadcrumbs %}
     {{ Breadcrumbs.renderIfExists(Route.getCurrentRoute.getName, piggyBank) }}
@@ -35,7 +35,7 @@
                 <div class="box-body table-responsive no-padding">
                     <table class="table table-hover">
                         <tr>
-                            <td>{{ 'account'|_ }}</td>
+                            <td style="width:40%;">{{ 'account'|_ }}</td>
                             <td><a href="{{ route('accounts.show', piggyBank.account_id) }}">{{ piggyBank.account.name }}</a></td>
                         </tr>
                         <tr>
@@ -48,7 +48,7 @@
                         </tr>
                         <tr>
                             <td>{{ 'left_to_save'|_ }}</td>
-                            <td>{{ piggyBank.targetamount - currentRelevantRepAmount(piggyBank)|formatAmount }}</td>
+                            <td>{{ (piggyBank.targetamount - currentRelevantRepAmount(piggyBank))|formatAmount }}</td>
                         </tr>
                         <tr>
                             <td>{{ 'start_date'|_ }}</td>
@@ -82,8 +82,23 @@
                 </div>
             </div>
         </div>
-
     </div>
+    {% if note %}
+        <div class="row">
+            <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+
+                <div class="box">
+                    <div class="box-header with-border">
+                        <h3 class="box-title">{{ trans('form.notes') }}</h3>
+                    </div>
+                    <div class="box-body">
+                            {{ note.markdown|raw }}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -92,6 +107,7 @@
     </script>
 
     <script type="text/javascript" src="js/lib/Chart.bundle.min.js"></script>
+    <script type="text/javascript" src="js/ff/charts.defaults.js"></script>
     <script type="text/javascript" src="js/ff/charts.js"></script>
     <script type="text/javascript" src="js/ff/piggy-banks/show.js"></script>
 {% endblock %}

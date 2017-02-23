@@ -3,8 +3,10 @@
  * Amount.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -15,7 +17,7 @@ use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionCurrency;
 use FireflyIII\Models\TransactionJournal;
 use Illuminate\Support\Collection;
-use NumberFormatter;
+use Log;
 use Preferences as Prefs;
 
 /**
@@ -25,6 +27,80 @@ use Preferences as Prefs;
  */
 class Amount
 {
+    /**
+     * bool $sepBySpace is $localeconv['n_sep_by_space']
+     * int $signPosn = $localeconv['n_sign_posn']
+     * string $sign = $localeconv['negative_sign']
+     * bool $csPrecedes = $localeconv['n_cs_precedes']
+     *
+     * @param bool   $sepBySpace
+     * @param int    $signPosn
+     * @param string $sign
+     * @param bool   $csPrecedes
+     *
+     * @return string
+     */
+    public static function getAmountJsConfig(bool $sepBySpace, int $signPosn, string $sign, bool $csPrecedes): string
+    {
+        // negative first:
+        $space = ' ';
+
+        // require space between symbol and amount?
+        if (!$sepBySpace) {
+            $space = ''; // no
+        }
+
+        // there are five possible positions for the "+" or "-" sign (if it is even used)
+        // pos_a and pos_e could be the ( and ) symbol.
+        $pos_a = ''; // before everything
+        $pos_b = ''; // before currency symbol
+        $pos_c = ''; // after currency symbol
+        $pos_d = ''; // before amount
+        $pos_e = ''; // after everything
+
+        // format would be (currency before amount)
+        // AB%sC_D%vE
+        // or:
+        // AD%v_B%sCE (amount before currency)
+        // the _ is the optional space
+
+
+        // switch on how to display amount:
+        switch ($signPosn) {
+            default:
+            case 0:
+                // ( and ) around the whole thing
+                $pos_a = '(';
+                $pos_e = ')';
+                break;
+            case 1:
+                // The sign string precedes the quantity and currency_symbol
+                $pos_a = $sign;
+                break;
+            case 2:
+                // The sign string succeeds the quantity and currency_symbol
+                $pos_e = $sign;
+                break;
+            case 3:
+                // The sign string immediately precedes the currency_symbol
+                $pos_b = $sign;
+                break;
+            case 4:
+                // The sign string immediately succeeds the currency_symbol
+                $pos_c = $sign;
+        }
+
+        // default is amount before currency
+        $format = $pos_a . $pos_d . '%v' . $space . $pos_b . '%s' . $pos_c . $pos_e;
+
+        if ($csPrecedes) {
+            // alternative is currency before amount
+            $format = $pos_a . $pos_b . '%s' . $pos_c . $space . $pos_d . '%v' . $pos_e;
+        }
+        Log::debug(sprintf('Final format: "%s"', $format));
+
+        return $format;
+    }
 
     /**
      * @param string $amount
@@ -41,35 +117,63 @@ class Amount
      * This method will properly format the given number, in color or "black and white",
      * as a currency, given two things: the currency required and the current locale.
      *
-     * @param TransactionCurrency $format
-     * @param string              $amount
-     * @param bool                $coloured
+     * @param \FireflyIII\Models\TransactionCurrency $format
+     * @param string                                 $amount
+     * @param bool                                   $coloured
      *
      * @return string
      */
     public function formatAnything(TransactionCurrency $format, string $amount, bool $coloured = true): string
     {
-        $locale    = setlocale(LC_MONETARY, 0);
-        $float     = round($amount, 2);
-        $formatter = new NumberFormatter($locale, NumberFormatter::CURRENCY);
-        $result    = $formatter->formatCurrency($float, $format->code);
+        $locale = explode(',', trans('config.locale'));
+        $locale = array_map('trim', $locale);
+        setlocale(LC_MONETARY, $locale);
+        $float     = round($amount, 12);
+        $info      = localeconv();
+        $formatted = number_format($float, $format->decimal_places, $info['mon_decimal_point'], $info['mon_thousands_sep']);
+
+        // some complicated switches to format the amount correctly:
+        $precedes  = $amount < 0 ? $info['n_cs_precedes'] : $info['p_cs_precedes'];
+        $separated = $amount < 0 ? $info['n_sep_by_space'] : $info['p_sep_by_space'];
+        $space     = $separated ? ' ' : '';
+        $result    = $format->symbol . $space . $formatted;
+
+        if (!$precedes) {
+            $result = $space . $formatted . $format->symbol;
+        }
 
         if ($coloured === true) {
 
             if ($amount > 0) {
-                return '<span class="text-success" title="' . e($float) . '">' . $result . '</span>';
+                return sprintf('<span class="text-success">%s</span>', $result);
             } else {
                 if ($amount < 0) {
-                    return '<span class="text-danger" title="' . e($float) . '">' . $result . '</span>';
+                    return sprintf('<span class="text-danger">%s</span>', $result);
                 }
             }
 
-            return '<span style="color:#999" title="' . e($float) . '">' . $result . '</span>';
+            return sprintf('<span style="color:#999">%s</span>', $result);
 
 
         }
 
         return $result;
+    }
+
+    /**
+     * Used in many places (unfortunately).
+     *
+     * @param string $currencyCode
+     * @param string $amount
+     * @param bool   $coloured
+     *
+     * @return string
+     */
+    public function formatByCode(string $currencyCode, string $amount, bool $coloured = true): string
+    {
+        $currency = TransactionCurrency::whereCode($currencyCode)->first();
+
+        return $this->formatAnything($currency, $amount, $coloured);
     }
 
     /**
@@ -81,27 +185,9 @@ class Amount
      */
     public function formatJournal(TransactionJournal $journal, bool $coloured = true): string
     {
-        $locale       = setlocale(LC_MONETARY, 0);
-        $float        = round(TransactionJournal::amount($journal), 2);
-        $formatter    = new NumberFormatter($locale, NumberFormatter::CURRENCY);
-        $currencyCode = $journal->transaction_currency_code ?? $journal->transactionCurrency->code;
-        $result       = $formatter->formatCurrency($float, $currencyCode);
+        $currency = $journal->transactionCurrency;
 
-        if ($coloured === true && $float === 0.00) {
-            return '<span style="color:#999">' . $result . '</span>'; // always grey.
-        }
-        if (!$coloured) {
-            return $result;
-        }
-        if (!$journal->isTransfer()) {
-            if ($float > 0) {
-                return '<span class="text-success">' . $result . '</span>';
-            }
-
-            return '<span class="text-danger">' . $result . '</span>';
-        } else {
-            return '<span class="text-info">' . $result . '</span>';
-        }
+        return $this->formatAnything($currency, TransactionJournal::amount($journal), $coloured);
     }
 
     /**
@@ -114,7 +200,7 @@ class Amount
     {
         $currency = $transaction->transactionJournal->transactionCurrency;
 
-        return $this->formatAnything($currency, $transaction->amount, $coloured);
+        return $this->formatAnything($currency, strval($transaction->amount), $coloured);
     }
 
     /**
@@ -136,7 +222,7 @@ class Amount
         if ($cache->has()) {
             return $cache->get();
         } else {
-            $currencyPreference = Prefs::get('currencyPreference', env('DEFAULT_CURRENCY', 'EUR'));
+            $currencyPreference = Prefs::get('currencyPreference', config('firefly.default_currency', 'EUR'));
 
             $currency = TransactionCurrency::whereCode($currencyPreference->data)->first();
             if ($currency) {
@@ -145,9 +231,9 @@ class Amount
 
                 return $currency->code;
             }
-            $cache->store(env('DEFAULT_CURRENCY', 'EUR'));
+            $cache->store(config('firefly.default_currency', 'EUR'));
 
-            return env('DEFAULT_CURRENCY', 'EUR');
+            return config('firefly.default_currency', 'EUR');
         }
     }
 
@@ -161,7 +247,7 @@ class Amount
         if ($cache->has()) {
             return $cache->get();
         } else {
-            $currencyPreference = Prefs::get('currencyPreference', env('DEFAULT_CURRENCY', 'EUR'));
+            $currencyPreference = Prefs::get('currencyPreference', config('firefly.default_currency', 'EUR'));
             $currency           = TransactionCurrency::whereCode($currencyPreference->data)->first();
 
             $cache->store($currency->symbol);
@@ -171,7 +257,7 @@ class Amount
     }
 
     /**
-     * @return TransactionCurrency
+     * @return \FireflyIII\Models\TransactionCurrency
      */
     public function getDefaultCurrency(): TransactionCurrency
     {
@@ -180,10 +266,30 @@ class Amount
         if ($cache->has()) {
             return $cache->get();
         }
-        $currencyPreference = Prefs::get('currencyPreference', 'EUR');
+        $currencyPreference = Prefs::get('currencyPreference', config('firefly.default_currency', 'EUR'));
         $currency           = TransactionCurrency::whereCode($currencyPreference->data)->first();
         $cache->store($currency);
 
         return $currency;
+    }
+
+    /**
+     * This method returns the correct format rules required by accounting.js,
+     * the library used to format amounts in charts.
+     *
+     * @param array $config
+     *
+     * @return array
+     */
+    public function getJsConfig(array $config): array
+    {
+        $negative = self::getAmountJsConfig($config['n_sep_by_space'] === 1, $config['n_sign_posn'], $config['negative_sign'], $config['n_cs_precedes'] === 1);
+        $positive = self::getAmountJsConfig($config['p_sep_by_space'] === 1, $config['p_sign_posn'], $config['positive_sign'], $config['p_cs_precedes'] === 1);
+
+        return [
+            'pos'  => $positive,
+            'neg'  => $negative,
+            'zero' => $positive,
+        ];
     }
 }

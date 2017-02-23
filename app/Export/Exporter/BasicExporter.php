@@ -3,8 +3,10 @@
  * BasicExporter.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -24,17 +26,15 @@ class BasicExporter
 {
     /** @var  ExportJob */
     protected $job;
-    private   $entries;
+    /** @var Collection */
+    private $entries;
 
     /**
      * BasicExporter constructor.
-     *
-     * @param ExportJob $job
      */
-    public function __construct(ExportJob $job)
+    public function __construct()
     {
         $this->entries = new Collection;
-        $this->job     = $job;
     }
 
     /**
@@ -51,6 +51,14 @@ class BasicExporter
     public function setEntries(Collection $entries)
     {
         $this->entries = $entries;
+    }
+
+    /**
+     * @param ExportJob $job
+     */
+    public function setJob(ExportJob $job)
+    {
+        $this->job = $job;
     }
 
 

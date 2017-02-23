@@ -1,7 +1,13 @@
 <?php
-declare(strict_types = 1);
-
-
+/**
+ * mail.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
 
 return [
 
@@ -14,7 +20,8 @@ return [
     | sending of e-mail. You may specify which one you're using throughout
     | your application here. By default, Laravel is setup for SMTP mail.
     |
-    | Supported: "smtp", "mail", "sendmail", "mailgun", "mandrill", "ses", "log"
+    | Supported: "smtp", "mail", "sendmail", "mailgun", "mandrill",
+    |            "ses", "sparkpost", "log"
     |
     */
 
@@ -57,7 +64,8 @@ return [
     |
     */
 
-    'from' => ['address' => env('MAIL_FROM', null), 'name' => 'Firefly III Mailer'],
+    'from' => ['address' => env('MAIL_FROM', 'noreply@example.com'), 'name' => 'Firefly III Mailer'],
+
 
     /*
     |--------------------------------------------------------------------------

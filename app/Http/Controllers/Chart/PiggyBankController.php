@@ -3,21 +3,22 @@
  * PiggyBankController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Http\Controllers\Chart;
 
-use FireflyIII\Generator\Chart\PiggyBank\PiggyBankChartGeneratorInterface;
+use FireflyIII\Generator\Chart\Basic\GeneratorInterface;
 use FireflyIII\Http\Controllers\Controller;
 use FireflyIII\Models\PiggyBank;
 use FireflyIII\Models\PiggyBankEvent;
 use FireflyIII\Repositories\PiggyBank\PiggyBankRepositoryInterface;
 use FireflyIII\Support\CacheProperties;
-use Illuminate\Support\Collection;
 use Response;
 
 
@@ -29,7 +30,7 @@ use Response;
 class PiggyBankController extends Controller
 {
 
-    /** @var PiggyBankChartGeneratorInterface */
+    /** @var GeneratorInterface */
     protected $generator;
 
     /**
@@ -39,7 +40,7 @@ class PiggyBankController extends Controller
     {
         parent::__construct();
         // create chart generator:
-        $this->generator = app(PiggyBankChartGeneratorInterface::class);
+        $this->generator = app(GeneratorInterface::class);
     }
 
     /**
@@ -54,26 +55,24 @@ class PiggyBankController extends Controller
     {
         // chart properties for cache:
         $cache = new CacheProperties;
-        $cache->addProperty('piggy-history');
+        $cache->addProperty('chart.piggy-bank.history');
         $cache->addProperty($piggyBank->id);
         if ($cache->has()) {
             return Response::json($cache->get());
         }
 
-        $set        = $repository->getEvents($piggyBank);
-        $set        = $set->reverse();
-        $collection = [];
+        $set       = $repository->getEvents($piggyBank);
+        $set       = $set->reverse();
+        $chartData = [];
+        $sum       = '0';
         /** @var PiggyBankEvent $entry */
         foreach ($set as $entry) {
-            $date   = $entry->date->format('Y-m-d');
-            $amount = $entry->amount;
-            if (isset($collection[$date])) {
-                $amount = bcadd($amount, $collection[$date]);
-            }
-            $collection[$date] = $amount;
+            $label             = $entry->date->formatLocalized(strval(trans('config.month_and_day')));
+            $sum               = bcadd($sum, $entry->amount);
+            $chartData[$label] = $sum;
         }
 
-        $data = $this->generator->history(new Collection($collection));
+        $data = $this->generator->singleSet($piggyBank->name, $chartData);
         $cache->store($data);
 
         return Response::json($data);

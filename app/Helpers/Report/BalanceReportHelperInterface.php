@@ -3,8 +3,10 @@
  * BalanceReportHelperInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -24,11 +26,11 @@ use Illuminate\Support\Collection;
 interface BalanceReportHelperInterface
 {
     /**
+     * @param Collection $accounts
      * @param Carbon     $start
      * @param Carbon     $end
-     * @param Collection $accounts
      *
      * @return Balance
      */
-    public function getBalanceReport(Carbon $start, Carbon $end, Collection $accounts): Balance;
+    public function getBalanceReport(Collection $accounts, Carbon $start, Carbon $end): Balance;
 }

@@ -3,8 +3,10 @@
  * Preference.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -16,32 +18,27 @@ use FireflyIII\Exceptions\FireflyException;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Log;
+
 /**
- * FireflyIII\Models\Preference
+ * Class Preference
  *
- * @property integer               $id
- * @property \Carbon\Carbon        $created_at
- * @property \Carbon\Carbon        $updated_at
- * @property integer               $user_id
- * @property string                $name
- * @property string                $name_encrypted
- * @property string                $data
- * @property-read \FireflyIII\User $user
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereUserId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereName($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereNameEncrypted($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereData($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Preference whereDataEncrypted($value)
- * @mixin \Eloquent
+ * @package FireflyIII\Models
  */
 class Preference extends Model
 {
 
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+                        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+        ];
     protected $dates    = ['created_at', 'updated_at'];
-    protected $fillable = ['user_id', 'data', 'name'];
+    protected $fillable = ['user_id', 'data', 'name', 'data'];
 
     /**
      * @param $value
@@ -54,11 +51,14 @@ class Preference extends Model
         try {
             $data = Crypt::decrypt($value);
         } catch (DecryptException $e) {
-            Log::error('Could not decrypt preference.', ['id' => $this->id,'name' => $this->name,'data' => $this->data]);
-            throw new FireflyException('Could not decrypt preference #' . $this->id . '.');
+            Log::error('Could not decrypt preference.', ['id' => $this->id, 'name' => $this->name, 'data' => $value]);
+            throw new FireflyException(
+                sprintf('Could not decrypt preference #%d. If this error persists, please run "php artisan cache:clear" on the command line.', $this->id)
+            );
         }
 
-        return json_decode($data);
+
+        return json_decode($data, true);
     }
 
     /**

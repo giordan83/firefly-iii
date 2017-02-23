@@ -3,8 +3,10 @@
  * BillName.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -27,6 +29,7 @@ class BillName extends BasicConverter implements ConverterInterface
     /**
      * @param $value
      *
+     * @return Bill
      * @throws FireflyException
      */
     public function convert($value)
@@ -36,11 +39,13 @@ class BillName extends BasicConverter implements ConverterInterface
 
         if (strlen($value) === 0) {
             $this->setCertainty(0);
+
             return new Bill;
         }
 
         /** @var BillRepositoryInterface $repository */
-        $repository = app(BillRepositoryInterface::class, [$this->user]);
+        $repository = app(BillRepositoryInterface::class);
+        $repository->setUser($this->user);
 
         if (isset($this->mapping[$value])) {
             Log::debug('Found bill in mapping. Should exist.', ['value' => $value, 'map' => $this->mapping[$value]]);
@@ -48,6 +53,7 @@ class BillName extends BasicConverter implements ConverterInterface
             if (!is_null($bill->id)) {
                 Log::debug('Found bill by ID', ['id' => $bill->id]);
                 $this->setCertainty(100);
+
                 return $bill;
             }
         }
@@ -57,6 +63,7 @@ class BillName extends BasicConverter implements ConverterInterface
         if (!is_null($bill->id)) {
             Log::debug('Found bill by name ', ['id' => $bill->id]);
             $this->setCertainty(100);
+
             return $bill;
         }
 
@@ -66,7 +73,7 @@ class BillName extends BasicConverter implements ConverterInterface
                 'name'        => $value,
                 'match'       => $value,
                 'amount_min'  => 1,
-                'user'     => $this->user->id,
+                'user'        => $this->user->id,
                 'amount_max'  => 10,
                 'date'        => date('Ymd'),
                 'repeat_freq' => 'monthly',

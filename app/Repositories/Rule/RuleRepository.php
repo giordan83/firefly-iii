@@ -3,8 +3,10 @@
  * RuleRepository.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -27,16 +29,6 @@ class RuleRepository implements RuleRepositoryInterface
 {
     /** @var User */
     private $user;
-
-    /**
-     * BillRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @return int
@@ -217,6 +209,14 @@ class RuleRepository implements RuleRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return Rule
@@ -231,7 +231,7 @@ class RuleRepository implements RuleRepositoryInterface
 
         // start by creating a new rule:
         $rule = new Rule;
-        $rule->user()->associate($data['user_id']);
+        $rule->user()->associate($this->user->id);
 
         $rule->rule_group_id   = $data['rule_group_id'];
         $rule->order           = ($order + 1);

@@ -3,8 +3,10 @@
  * PiggyBankRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -13,6 +15,7 @@ namespace FireflyIII\Repositories\PiggyBank;
 
 use FireflyIII\Models\PiggyBank;
 use FireflyIII\Models\PiggyBankEvent;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 /**
@@ -56,7 +59,7 @@ interface PiggyBankRepositoryInterface
      *
      * @return Collection
      */
-    public function getEvents(PiggyBank $piggyBank) : Collection;
+    public function getEvents(PiggyBank $piggyBank): Collection;
 
     /**
      * Highest order of all piggy banks.
@@ -70,14 +73,14 @@ interface PiggyBankRepositoryInterface
      *
      * @return Collection
      */
-    public function getPiggyBanks() : Collection;
+    public function getPiggyBanks(): Collection;
 
     /**
      * Also add amount in name.
      *
      * @return Collection
      */
-    public function getPiggyBanksWithAmount() : Collection;
+    public function getPiggyBanksWithAmount(): Collection;
 
     /**
      * Set all piggy banks to order 0.
@@ -96,6 +99,10 @@ interface PiggyBankRepositoryInterface
      */
     public function setOrder(int $piggyBankId, int $order): bool;
 
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 
     /**
      * Store new piggy bank.

@@ -3,8 +3,10 @@
  * Configuration.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -15,29 +17,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * FireflyIII\Models\Configuration
+ * Class Configuration
  *
- * @mixin \Eloquent
- * @property integer $id
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
- * @property \Carbon\Carbon $deleted_at
- * @property string $name
- * @property string $data
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereDeletedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereName($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Configuration whereData($value)
+ * @package FireflyIII\Models
  */
 class Configuration extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'configuration';
-
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+        ];
+    /** @var array */
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+    protected $table = 'configuration';
 
     /**
      * @param $value
@@ -56,7 +56,6 @@ class Configuration extends Model
     {
         $this->attributes['data'] = json_encode($value);
     }
-
 
 
 }

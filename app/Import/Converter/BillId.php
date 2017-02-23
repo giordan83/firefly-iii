@@ -3,8 +3,10 @@
  * BillId.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -40,7 +42,8 @@ class BillId extends BasicConverter implements ConverterInterface
         }
 
         /** @var BillRepositoryInterface $repository */
-        $repository = app(BillRepositoryInterface::class, [$this->user]);
+        $repository = app(BillRepositoryInterface::class);
+        $repository->setUser($this->user);
 
         if (isset($this->mapping[$value])) {
             Log::debug('Found bill in mapping. Should exist.', ['value' => $value, 'map' => $this->mapping[$value]]);

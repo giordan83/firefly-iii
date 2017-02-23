@@ -3,8 +3,10 @@
  * PiggyBankServiceProvider.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -12,7 +14,8 @@ declare(strict_types = 1);
 
 namespace FireflyIII\Providers;
 
-use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Repositories\PiggyBank\PiggyBankRepository;
+use FireflyIII\Repositories\PiggyBank\PiggyBankRepositoryInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -42,16 +45,15 @@ class PiggyBankServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind(
-            'FireflyIII\Repositories\PiggyBank\PiggyBankRepositoryInterface',
-            function (Application $app, array $arguments) {
-                if (!isset($arguments[0]) && $app->auth->check()) {
-                    return app('FireflyIII\Repositories\PiggyBank\PiggyBankRepository', [auth()->user()]);
-                }
-                if (!isset($arguments[0]) && !$app->auth->check()) {
-                    throw new FireflyException('There is no user present.');
+            PiggyBankRepositoryInterface::class,
+            function (Application $app) {
+                /** @var PiggyBankRepository $repository */
+                $repository = app(PiggyBankRepository::class);
+                if ($app->auth->check()) {
+                    $repository->setUser(auth()->user());
                 }
 
-                return app('FireflyIII\Repositories\PiggyBank\PiggyBankRepository', $arguments);
+                return $repository;
             }
         );
     }

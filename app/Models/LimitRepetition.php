@@ -3,47 +3,42 @@
  * LimitRepetition.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Models;
 
-use Auth;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * FireflyIII\Models\LimitRepetition
+ * Class LimitRepetition
  *
- * @property integer          $id
- * @property \Carbon\Carbon   $created_at
- * @property \Carbon\Carbon   $updated_at
- * @property integer          $budget_limit_id
- * @property \Carbon\Carbon   $startdate
- * @property \Carbon\Carbon   $enddate
- * @property float            $amount
- * @property-read BudgetLimit $budgetLimit
- * @property int              $budget_id
- * @property string           $spent
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereBudgetLimitId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereStartdate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereEnddate($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition whereAmount($value)
- * @mixin \Eloquent
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition after($date)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\LimitRepetition before($date)
+ * @deprecated
+ * @package FireflyIII\Models
  */
 class LimitRepetition extends Model
 {
 
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+                      = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+            'startdate'  => 'date',
+            'enddate'    => 'date',
+        ];
     protected $dates  = ['created_at', 'updated_at', 'startdate', 'enddate'];
     protected $hidden = ['amount_encrypted'];
 
@@ -54,12 +49,12 @@ class LimitRepetition extends Model
      */
     public static function routeBinder($value)
     {
-        if (Auth::check()) {
-            $object = LimitRepetition::where('limit_repetitions.id', $value)
-                                     ->leftjoin('budget_limits', 'budget_limits.id', '=', 'limit_repetitions.budget_limit_id')
-                                     ->leftJoin('budgets', 'budgets.id', '=', 'budget_limits.budget_id')
-                                     ->where('budgets.user_id', Auth::user()->id)
-                                     ->first(['limit_repetitions.*']);
+        if (auth()->check()) {
+            $object = self::where('limit_repetitions.id', $value)
+                          ->leftJoin('budget_limits', 'budget_limits.id', '=', 'limit_repetitions.budget_limit_id')
+                          ->leftJoin('budgets', 'budgets.id', '=', 'budget_limits.budget_id')
+                          ->where('budgets.user_id', auth()->user()->id)
+                          ->first(['limit_repetitions.*']);
             if ($object) {
                 return $object;
             }

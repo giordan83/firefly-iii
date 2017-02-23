@@ -3,19 +3,19 @@
  * AttachmentCollector.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Export\Collector;
 
-use Amount;
+use Carbon\Carbon;
 use Crypt;
 use FireflyIII\Models\Attachment;
-use FireflyIII\Models\ExportJob;
-use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Repositories\Attachment\AttachmentRepositoryInterface;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Collection;
@@ -29,21 +29,21 @@ use Storage;
  */
 class AttachmentCollector extends BasicCollector implements CollectorInterface
 {
-    /** @var string */
-    private $explanationString = '';
+    /** @var  Carbon */
+    private $end;
     /** @var \Illuminate\Contracts\Filesystem\Filesystem */
     private $exportDisk;
     /** @var  AttachmentRepositoryInterface */
     private $repository;
+    /** @var  Carbon */
+    private $start;
     /** @var \Illuminate\Contracts\Filesystem\Filesystem */
     private $uploadDisk;
 
     /**
      * AttachmentCollector constructor.
-     *
-     * @param ExportJob $job
      */
-    public function __construct(ExportJob $job)
+    public function __construct()
     {
         /** @var AttachmentRepositoryInterface repository */
         $this->repository = app(AttachmentRepositoryInterface::class);
@@ -51,7 +51,7 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
         $this->uploadDisk = Storage::disk('upload');
         $this->exportDisk = Storage::disk('export');
 
-        parent::__construct($job);
+        parent::__construct();
     }
 
     /**
@@ -67,33 +67,17 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
             $this->exportAttachment($attachment);
         }
 
-        // put the explanation string in a file and attach it as well.
-        $file = $this->job->key . '-Source of all your attachments explained.txt';
-        $this->exportDisk->put($file, $this->explanationString);
-        $this->getFiles()->push($file);
-
         return true;
     }
 
     /**
-     * @param Attachment $attachment
+     * @param Carbon $start
+     * @param Carbon $end
      */
-    private function explain(Attachment $attachment)
+    public function setDates(Carbon $start, Carbon $end)
     {
-        /** @var TransactionJournal $journal */
-        $journal = $attachment->attachable;
-        $args    = [
-            'attachment_name' => e($attachment->filename),
-            'attachment_id'   => $attachment->id,
-            'type'            => strtolower($journal->transactionType->type),
-            'description'     => e($journal->description),
-            'journal_id'      => $journal->id,
-            'date'            => $journal->date->formatLocalized(strval(trans('config.month_and_day'))),
-            'amount'          => Amount::formatJournal($journal, false),
-        ];
-        $string  = trans('firefly.attachment_explanation', $args) . "\n";
-        $this->explanationString .= $string;
-
+        $this->start = $start;
+        $this->end   = $end;
     }
 
     /**
@@ -109,10 +93,8 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
                 $decrypted  = Crypt::decrypt($this->uploadDisk->get($file));
                 $exportFile = $this->exportFileName($attachment);
                 $this->exportDisk->put($exportFile, $decrypted);
-                $this->getFiles()->push($exportFile);
+                $this->getEntries()->push($exportFile);
 
-                // explain:
-                $this->explain($attachment);
             } catch (DecryptException $e) {
                 Log::error('Catchable error: could not decrypt attachment #' . $attachment->id . ' because: ' . $e->getMessage());
             }
@@ -140,7 +122,7 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
      */
     private function getAttachments(): Collection
     {
-        $attachments = $this->repository->get();
+        $attachments = $this->repository->getBetween($this->start, $this->end);
 
         return $attachments;
     }

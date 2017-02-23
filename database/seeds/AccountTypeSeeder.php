@@ -1,4 +1,14 @@
 <?php
+/**
+ * AccountTypeSeeder.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
+
 declare(strict_types = 1);
 
 use FireflyIII\Models\AccountType;
@@ -11,8 +21,6 @@ class AccountTypeSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('account_types')->delete();
-
         AccountType::create(['type' => 'Default account']);
         AccountType::create(['type' => 'Cash account']);
         AccountType::create(['type' => 'Asset account']);
@@ -21,6 +29,7 @@ class AccountTypeSeeder extends Seeder
         AccountType::create(['type' => 'Initial balance account']);
         AccountType::create(['type' => 'Beneficiary account']);
         AccountType::create(['type' => 'Import account']);
+        AccountType::create(['type' => 'Loan']);
     }
 
 

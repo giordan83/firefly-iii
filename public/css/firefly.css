@@ -1,6 +1,26 @@
-#daterange {cursor:pointer;}
-.general-chart-error {height:30px;background:url('/images/error.png') no-repeat center center;}
-.handle {cursor:move;}
+/*
+ * firefly.css
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
+
+#daterange {
+    cursor: pointer;
+}
+
+.general-chart-error {
+    height: 30px;
+    background: url('/images/error.png') no-repeat center center;
+}
+
+.handle {
+    cursor: move;
+}
+
 body.waiting * {
     cursor: progress;
 }
@@ -9,38 +29,85 @@ body.waiting * {
     display: inline-block;
     height: 1px;
 }
+
+.preferences-box {
+    border: 1px #ddd solid;
+    border-radius: 4px 4px 0 0;
+    padding: 15px;
+    margin: 15px;
+}
+
 #map-canvas {
     height: 100%;
     margin: 0;
     padding: 0;
 }
 
-
 .ff-error-page {
     width: 1000px;
     margin: 20px auto 0 auto;
 }
+
 .ff-error-page > .headline {
     float: left;
     font-size: 100px;
     font-weight: 300;
 }
+
 .ff-error-page > .error-content {
     margin-left: 190px;
     display: block;
 }
+
 .ff-error-page > .error-content > h3 {
     font-weight: 300;
     font-size: 25px;
 }
+
 .ff-error-box {
     width: 460px;
     margin: 7% auto;
 }
 
 /* cursors */
-.rule-triggers {cursor:move;}
-.rule-actions {cursor:move;}
-.firefly-info-button {cursor:pointer;}
+.rule-triggers {
+    cursor: move;
+}
 
-#testTriggerModal .modal-body { max-height: 500px; overflow-y: scroll; }
+.rule-actions {
+    cursor: move;
+}
+
+.firefly-info-button {
+    cursor: pointer;
+}
+
+#testTriggerModal .modal-body {
+    max-height: 500px;
+    overflow-y: scroll;
+}
+
+.bootstrap-tagsinput {
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.loading {
+    background: url('/images/loading-small.gif') no-repeat center center;
+    min-height: 30px;
+}
+
+@media print {
+    a[href]:after {
+        content: none !important;
+    }
+}
+
+.edit_tr_buttons {
+    white-space: nowrap;
+}
+
+.edit_tr_buttons .btn {
+    float: none;
+    display: inline-block;
+}

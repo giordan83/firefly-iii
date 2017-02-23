@@ -3,15 +3,16 @@
  * RuleGroup.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
 
 namespace FireflyIII\Models;
 
-use Auth;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -20,42 +21,43 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Class RuleGroup
  *
  * @package FireflyIII\Models
- * @property integer                                                                 $id
- * @property \Carbon\Carbon                                                          $created_at
- * @property \Carbon\Carbon                                                          $updated_at
- * @property string                                                                  $deleted_at
- * @property integer                                                                 $user_id
- * @property integer                                                                 $order
- * @property string                                                                  $title
- * @property string                                                                  $description
- * @property boolean                                                                 $active
- * @property-read \FireflyIII\User                                                   $user
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Rule[] $rules
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereDeletedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereUserId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereOrder($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereTitle($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereDescription($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleGroup whereActive($value)
- * @mixin \Eloquent
  */
 class RuleGroup extends Model
 {
     use SoftDeletes;
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+        = [
+            'created_at' => 'date',
+            'updated_at' => 'date',
+            'deleted_at' => 'date',
+            'active'     => 'boolean',
+            'order'      => 'int',
+        ];
+    /** @var array */
+    protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+
 
     protected $fillable = ['user_id', 'order', 'title', 'description', 'active'];
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @param RuleGroup $value
+     *
+     * @return RuleGroup
      */
-    public function user()
+    public static function routeBinder(RuleGroup $value)
     {
-        return $this->belongsTo('FireflyIII\User');
+        if (auth()->check()) {
+            if ($value->user_id == auth()->user()->id) {
+                return $value;
+            }
+        }
+        throw new NotFoundHttpException;
     }
-
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
@@ -66,17 +68,10 @@ class RuleGroup extends Model
     }
 
     /**
-     * @param RuleGroup $value
-     *
-     * @return Rule
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public static function routeBinder(RuleGroup $value)
+    public function user()
     {
-        if (Auth::check()) {
-            if ($value->user_id == Auth::user()->id) {
-                return $value;
-            }
-        }
-        throw new NotFoundHttpException;
+        return $this->belongsTo('FireflyIII\User');
     }
 }

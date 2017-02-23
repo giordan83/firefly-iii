@@ -3,8 +3,10 @@
  * RuleGroupRepositoryInterface.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -24,7 +26,6 @@ use Illuminate\Support\Collection;
 interface RuleGroupRepositoryInterface
 {
 
-
     /**
      *
      *
@@ -33,12 +34,19 @@ interface RuleGroupRepositoryInterface
     public function count(): int;
 
     /**
-     * @param RuleGroup $ruleGroup
-     * @param RuleGroup $moveTo
+     * @param RuleGroup      $ruleGroup
+     * @param RuleGroup|null $moveTo
      *
      * @return bool
      */
     public function destroy(RuleGroup $ruleGroup, RuleGroup $moveTo = null): bool;
+
+    /**
+     * @param int $ruleGroupId
+     *
+     * @return RuleGroup
+     */
+    public function find(int $ruleGroupId): RuleGroup;
 
     /**
      * @return Collection
@@ -82,6 +90,11 @@ interface RuleGroupRepositoryInterface
      * @return bool
      */
     public function resetRulesInGroupOrder(RuleGroup $ruleGroup): bool;
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 
     /**
      * @param array $data

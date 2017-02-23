@@ -3,21 +3,28 @@
  * ImportController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
+declare(strict_types = 1);
 
 namespace FireflyIII\Http\Controllers;
 
 use Crypt;
 use FireflyIII\Exceptions\FireflyException;
-use FireflyIII\Http\Requests;
 use FireflyIII\Http\Requests\ImportUploadRequest;
+use FireflyIII\Import\ImportProcedureInterface;
 use FireflyIII\Import\Setup\SetupInterface;
 use FireflyIII\Models\ImportJob;
 use FireflyIII\Repositories\ImportJob\ImportJobRepositoryInterface;
+use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as LaravelResponse;
 use Log;
+use Response;
+use Session;
 use SplFileObject;
 use Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -36,8 +43,15 @@ class ImportController extends Controller
     public function __construct()
     {
         parent::__construct();
-        View::share('mainTitleIcon', 'fa-archive');
-        View::share('title', trans('firefly.import_data_full'));
+
+        $this->middleware(
+            function ($request, $next) {
+                View::share('mainTitleIcon', 'fa-archive');
+                View::share('title', trans('firefly.import_data_full'));
+
+                return $next($request);
+            }
+        );
     }
 
     /**
@@ -53,7 +67,7 @@ class ImportController extends Controller
         if (!$this->jobInCorrectStep($job, 'complete')) {
             return $this->redirectToCorrectStep($job);
         }
-        $subTitle     = trans('firefy.import_complete');
+        $subTitle     = trans('firefly.import_complete');
         $subTitleIcon = 'fa-star';
 
         return view('import.complete', compact('job', 'subTitle', 'subTitleIcon'));
@@ -103,20 +117,46 @@ class ImportController extends Controller
         $config                            = $job->configuration;
         $config['column-roles-complete']   = false;
         $config['column-mapping-complete'] = false;
+        $config['delimiter']               = $config['delimiter'] === "\t" ? 'tab' : $config['delimiter'];
         $result                            = json_encode($config, JSON_PRETTY_PRINT);
         $name                              = sprintf('"%s"', addcslashes('import-configuration-' . date('Y-m-d') . '.json', '"\\'));
 
-        return response($result, 200)
-            ->header('Content-disposition', 'attachment; filename=' . $name)
-            ->header('Content-Type', 'application/json')
-            ->header('Content-Description', 'File Transfer')
-            ->header('Connection', 'Keep-Alive')
-            ->header('Expires', '0')
-            ->header('Cache-Control', 'must-revalidate, post-check=0, pre-check=0')
-            ->header('Pragma', 'public')
-            ->header('Content-Length', strlen($result));
+        /** @var LaravelResponse $response */
+        $response = response($result, 200);
+        $response->header('Content-disposition', 'attachment; filename=' . $name)
+                 ->header('Content-Type', 'application/json')
+                 ->header('Content-Description', 'File Transfer')
+                 ->header('Connection', 'Keep-Alive')
+                 ->header('Expires', '0')
+                 ->header('Cache-Control', 'must-revalidate, post-check=0, pre-check=0')
+                 ->header('Pragma', 'public')
+                 ->header('Content-Length', strlen($result));
+
+        return $response;
 
 
+    }
+
+    /**
+     * @param ImportJob $job
+     *
+     * @return View
+     */
+    public function finished(ImportJob $job)
+    {
+        if (!$this->jobInCorrectStep($job, 'finished')) {
+            Log::debug('Job is not in correct state for finished()', ['status' => $job->status]);
+
+            return $this->redirectToCorrectStep($job);
+        }
+
+        // if there is a tag (there might not be), we can link to it:
+        $tagId = $job->extended_status['importTag'] ?? 0;
+
+        $subTitle     = trans('firefly.import_finished');
+        $subTitleIcon = 'fa-star';
+
+        return view('import.finished', compact('job', 'subTitle', 'subTitleIcon', 'tagId'));
     }
 
     /**
@@ -137,6 +177,48 @@ class ImportController extends Controller
         }
 
         return view('import.index', compact('subTitle', 'subTitleIcon', 'importFileTypes', 'defaultImportType'));
+    }
+
+    /**
+     * @param ImportJob $job
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function json(ImportJob $job)
+    {
+        $result     = [
+            'showPercentage' => false,
+            'started'        => false,
+            'finished'       => false,
+            'running'        => false,
+            'errors'         => $job->extended_status['errors'],
+            'percentage'     => 0,
+            'steps'          => $job->extended_status['total_steps'],
+            'stepsDone'      => $job->extended_status['steps_done'],
+            'statusText'     => trans('firefly.import_status_' . $job->status),
+            'finishedText'   => '',
+        ];
+        $percentage = 0;
+        if ($job->extended_status['total_steps'] !== 0) {
+            $percentage = round(($job->extended_status['steps_done'] / $job->extended_status['total_steps']) * 100, 0);
+        }
+        if ($job->status === 'import_complete') {
+            $tagId = $job->extended_status['importTag'];
+            /** @var TagRepositoryInterface $repository */
+            $repository             = app(TagRepositoryInterface::class);
+            $tag                    = $repository->find($tagId);
+            $result['finished']     = true;
+            $result['finishedText'] = trans('firefly.import_finished_link', ['link' => route('tags.show', [$tag->id]), 'tag' => $tag->tag]);
+        }
+
+        if ($job->status === 'import_running') {
+            $result['started']        = true;
+            $result['running']        = true;
+            $result['showPercentage'] = true;
+            $result['percentage']     = $percentage;
+        }
+
+        return Response::json($result);
     }
 
     /**
@@ -200,7 +282,7 @@ class ImportController extends Controller
      *
      * @param ImportJob $job
      *
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     * @return View
      * @throws FireflyException
      */
     public function settings(ImportJob $job)
@@ -238,6 +320,37 @@ class ImportController extends Controller
     }
 
     /**
+     * @param ImportProcedureInterface $importProcedure
+     * @param ImportJob                $job
+     */
+    public function start(ImportProcedureInterface $importProcedure, ImportJob $job)
+    {
+        set_time_limit(0);
+        if ($job->status == 'settings_complete') {
+            $importProcedure->runImport($job);
+        }
+    }
+
+    /**
+     * This is the last step before the import starts.
+     *
+     * @param ImportJob $job
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|View
+     */
+    public function status(ImportJob $job)
+    { //
+        Log::debug('Now in status()', ['job' => $job->key]);
+        if (!$this->jobInCorrectStep($job, 'status')) {
+            return $this->redirectToCorrectStep($job);
+        }
+        $subTitle     = trans('firefly.import_status');
+        $subTitleIcon = 'fa-star';
+
+        return view('import.status', compact('job', 'subTitle', 'subTitleIcon'));
+    }
+
+    /**
      * This is step 2. It creates an Import Job. Stores the import.
      *
      * @param ImportUploadRequest          $request
@@ -260,14 +373,33 @@ class ImportController extends Controller
         $content          = $uploaded->fread($uploaded->getSize());
         $contentEncrypted = Crypt::encrypt($content);
         $disk             = Storage::disk('upload');
-        $disk->put($newName, $contentEncrypted);
 
-        Log::debug('Uploaded file', ['name' => $upload->getClientOriginalName(), 'size' => $upload->getSize(), 'mime' => $upload->getClientMimeType()]);
+        // user is demo user, replace upload with prepared file.
+        if (auth()->user()->hasRole('demo')) {
+            $stubsDisk        = Storage::disk('stubs');
+            $content          = $stubsDisk->get('demo-import.csv');
+            $contentEncrypted = Crypt::encrypt($content);
+            $disk->put($newName, $contentEncrypted);
+            Log::debug('Replaced upload with demo file.');
 
-        // store configuration file's content into the job's configuration
-        // thing.
-        // otherwise, leave it empty.
-        if ($request->files->has('configuration_file')) {
+            // also set up prepared configuration.
+            $configuration      = json_decode($stubsDisk->get('demo-configuration.json'), true);
+            $job->configuration = $configuration;
+            $job->save();
+            Log::debug('Set configuration for demo user', $configuration);
+
+            // also flash info
+            Session::flash('info', trans('demo.import-configure-security'));
+        }
+        if (!auth()->user()->hasRole('demo')) {
+            // user is not demo, process original upload:
+            $disk->put($newName, $contentEncrypted);
+            Log::debug('Uploaded file', ['name' => $upload->getClientOriginalName(), 'size' => $upload->getSize(), 'mime' => $upload->getClientMimeType()]);
+        }
+
+        // store configuration file's content into the job's configuration thing. Otherwise, leave it empty.
+        // demo user's configuration upload is ignored completely.
+        if ($request->files->has('configuration_file') && !auth()->user()->hasRole('demo')) {
             /** @var UploadedFile $configFile */
             $configFile = $request->files->get('configuration_file');
             Log::debug(
@@ -285,6 +417,9 @@ class ImportController extends Controller
                 $job->save();
             }
         }
+
+        // if user is demo user, replace config with prepared config:
+
 
         return redirect(route('import.configure', [$job->key]));
 
@@ -306,8 +441,12 @@ class ImportController extends Controller
             case 'settings':
             case 'store-settings':
                 return $job->status === 'import_configuration_saved';
+            case 'finished':
+                return $job->status === 'import_complete';
             case 'complete':
                 return $job->status === 'settings_complete';
+            case 'status':
+                return ($job->status === 'settings_complete') || ($job->status === 'import_running');
         }
 
         return false;
@@ -318,16 +457,25 @@ class ImportController extends Controller
      * @param ImportJob $job
      *
      * @return SetupInterface
+     * @throws FireflyException
      */
     private function makeImporter(ImportJob $job): SetupInterface
     {
         // create proper importer (depends on job)
-        $type = $job->file_type;
-        /** @var SetupInterface $importer */
-        $importer = app('FireflyIII\Import\Setup\\' . ucfirst($type) . 'Setup');
-        $importer->setJob($job);
+        $type = strtolower($job->file_type);
 
-        return $importer;
+        // validate type:
+        $validTypes = array_keys(config('firefly.import_formats'));
+
+
+        if (in_array($type, $validTypes)) {
+            /** @var SetupInterface $importer */
+            $importer = app('FireflyIII\Import\Setup\\' . ucfirst($type) . 'Setup');
+            $importer->setJob($job);
+
+            return $importer;
+        }
+        throw new FireflyException(sprintf('"%s" is not a valid file type', $type));
 
     }
 
@@ -353,6 +501,10 @@ class ImportController extends Controller
                 Log::debug('Will redirect to complete()');
 
                 return redirect(route('import.complete', [$job->key]));
+            case 'import_complete':
+                Log::debug('Will redirect to finished()');
+
+                return redirect(route('import.finished', [$job->key]));
         }
 
         throw new FireflyException('Cannot redirect for job state ' . $job->status);

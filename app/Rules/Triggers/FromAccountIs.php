@@ -3,8 +3,10 @@
  * FromAccountIs.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 declare(strict_types = 1);
@@ -13,6 +15,7 @@ namespace FireflyIII\Rules\Triggers;
 
 use FireflyIII\Models\Account;
 use FireflyIII\Models\TransactionJournal;
+use Log;
 
 /**
  * Class FromAccountIs
@@ -43,6 +46,7 @@ final class FromAccountIs extends AbstractTrigger implements TriggerInterface
         if (!is_null($value)) {
             return false;
         }
+        Log::error(sprintf('Cannot use %s with a null value.', self::class));
 
         return true;
     }
@@ -63,9 +67,13 @@ final class FromAccountIs extends AbstractTrigger implements TriggerInterface
 
         $search = strtolower($this->triggerValue);
 
-        if ($name == $search) {
+        if ($name === $search) {
+            Log::debug(sprintf('RuleTrigger FromAccountIs for journal #%d: "%s" is "%s", return true.', $journal->id, $name, $search));
+
             return true;
         }
+
+        Log::debug(sprintf('RuleTrigger FromAccountIs for journal #%d: "%s" is NOT "%s", return false.', $journal->id, $name, $search));
 
         return false;
 

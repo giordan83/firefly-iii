@@ -3,13 +3,16 @@
  * list.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
 return [
     'buttons'               => 'Buttons',
     'icon'                  => 'Icon',
+    'id'                    => 'ID',
     'create_date'           => 'Created at',
     'update_date'           => 'Updated at',
     'balance_before'        => 'Balance before',
@@ -23,6 +26,7 @@ return [
     'matchedOn'             => 'Matched on',
     'matchesOn'             => 'Matched on',
     'account_type'          => 'Account type',
+    'created_at'            => 'Created at',
     'new_balance'           => 'New balance',
     'account'               => 'Account',
     'matchingAmount'        => 'Amount',
@@ -30,15 +34,21 @@ return [
     'split_number'          => 'Split #',
     'destination'           => 'Destination',
     'source'                => 'Source',
-    'expectedMatch'         => 'Expected match',
+    'next_expected_match'   => 'Next expected match',
     'automatch'             => 'Auto match?',
     'repeat_freq'           => 'Repeats',
     'description'           => 'Description',
     'amount'                => 'Amount',
+    'internal_reference'    => 'Internal reference',
     'date'                  => 'Date',
     'interest_date'         => 'Interest date',
     'book_date'             => 'Book date',
     'process_date'          => 'Processing date',
+    'due_date'              => 'Due date',
+    'payment_date'          => 'Payment date',
+    'invoice_date'          => 'Invoice date',
+    'interal_reference'     => 'Internal reference',
+    'notes'                 => 'Notes',
     'from'                  => 'From',
     'piggy_bank'            => 'Piggy bank',
     'to'                    => 'To',
@@ -63,4 +73,17 @@ return [
     'blocked_code'          => 'Block code',
     'domain'                => 'Domain',
     'registration_attempts' => 'Registration attempts',
+    'source_account'        => 'Source account',
+    'destination_account'   => 'Destination account',
+
+    'accounts_count'        => 'Number of accounts',
+    'journals_count'        => 'Number of transactions',
+    'attachments_count'     => 'Number of attachments',
+    'bills_count'           => 'Number of bills',
+    'categories_count'      => 'Number of categories',
+    'export_jobs_count'     => 'Number of export jobs',
+    'import_jobs_count'     => 'Number of import jobs',
+    'budget_count'          => 'Number of budgets',
+    'rule_and_groups_count' => 'Number of rules and rule groups',
+    'tags_count'            => 'Number of tags',
 ];
