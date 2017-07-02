@@ -9,12 +9,13 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\ImportJob;
 
 use FireflyIII\Models\ImportJob;
 use FireflyIII\User;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
  * Interface ImportJobRepositoryInterface
@@ -38,7 +39,39 @@ interface ImportJobRepositoryInterface
     public function findByKey(string $key): ImportJob;
 
     /**
+     * @param ImportJob    $job
+     * @param UploadedFile $file
+     *
+     * @return mixed
+     */
+    public function processFile(ImportJob $job, UploadedFile $file): bool;
+
+    /**
+     * @param ImportJob    $job
+     * @param UploadedFile $file
+     *
+     * @return bool
+     */
+    public function processConfiguration(ImportJob $job, UploadedFile $file): bool;
+
+    /**
+     * @param ImportJob $job
+     * @param array     $configuration
+     *
+     * @return ImportJob
+     */
+    public function setConfiguration(ImportJob $job, array $configuration): ImportJob;
+
+    /**
      * @param User $user
      */
     public function setUser(User $user);
+
+    /**
+     * @param ImportJob $job
+     * @param string    $status
+     *
+     * @return ImportJob
+     */
+    public function updateStatus(ImportJob $job, string $status): ImportJob;
 }

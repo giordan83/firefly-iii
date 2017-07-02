@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Requests;
 
@@ -38,21 +38,19 @@ class AccountFormRequest extends Request
     public function getAccountData(): array
     {
         return [
-            'name'                   => $this->string('name'),
-            'active'                 => $this->boolean('active'),
-            'accountType'            => $this->string('what'),
-            'currency_id'            => $this->integer('currency_id'),
-            'virtualBalance'         => $this->float('virtualBalance'),
-            'virtualBalanceCurrency' => $this->integer('amount_currency_id_virtualBalance'),
-            'iban'                   => $this->string('iban'),
-            'BIC'                    => $this->string('BIC'),
-            'accountNumber'          => $this->string('accountNumber'),
-            'accountRole'            => $this->string('accountRole'),
-            'openingBalance'         => $this->float('openingBalance'),
-            'openingBalanceDate'     => $this->date('openingBalanceDate'),
-            'openingBalanceCurrency' => $this->integer('amount_currency_id_openingBalance'),
-            'ccType'                 => $this->string('ccType'),
-            'ccMonthlyPaymentDate'   => $this->string('ccMonthlyPaymentDate'),
+            'name'                 => $this->string('name'),
+            'active'               => $this->boolean('active'),
+            'accountType'          => $this->string('what'),
+            'currency_id'          => $this->integer('currency_id'),
+            'virtualBalance'       => $this->float('virtualBalance'),
+            'iban'                 => $this->string('iban'),
+            'BIC'                  => $this->string('BIC'),
+            'accountNumber'        => $this->string('accountNumber'),
+            'accountRole'          => $this->string('accountRole'),
+            'openingBalance'       => $this->float('openingBalance'),
+            'openingBalanceDate'   => $this->date('openingBalanceDate'),
+            'ccType'               => $this->string('ccType'),
+            'ccMonthlyPaymentDate' => $this->string('ccMonthlyPaymentDate'),
         ];
     }
 

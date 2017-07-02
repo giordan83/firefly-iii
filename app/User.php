@@ -9,12 +9,13 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 namespace FireflyIII;
 
 use FireflyIII\Events\RequestedNewPassword;
+use FireflyIII\Models\CurrencyExchangeRate;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -122,6 +123,14 @@ class User extends Authenticatable
     /**
      * @return HasMany
      */
+    public function currencyExchangeRates(): HasMany
+    {
+        return $this->hasMany(CurrencyExchangeRate::class);
+    }
+
+    /**
+     * @return HasMany
+     */
     public function exportJobs(): HasMany
     {
         return $this->hasMany('FireflyIII\Models\ExportJob');
@@ -205,9 +214,9 @@ class User extends Authenticatable
      */
     public function sendPasswordResetNotification($token)
     {
-        $ip = Request::ip();
+        $ipAddress = Request::ip();
 
-        event(new RequestedNewPassword($this, $token, $ip));
+        event(new RequestedNewPassword($this, $token, $ipAddress));
     }
 
     /**

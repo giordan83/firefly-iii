@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Transaction;
 
@@ -93,7 +93,7 @@ class SplitController extends Controller
         }
 
         $uploadSize     = min(Steam::phpBytes(ini_get('upload_max_filesize')), Steam::phpBytes(ini_get('post_max_size')));
-        $currencies     = ExpandedForm::makeSelectList($this->currencies->get());
+        $currencies     = $this->currencies->get();
         $assetAccounts  = ExpandedForm::makeSelectList($this->accounts->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]));
         $optionalFields = Preferences::get('transaction_journal_optional_fields', [])->data;
         $budgets        = ExpandedForm::makeSelectListWithEmpty($this->budgets->getActiveBudgets());
@@ -130,7 +130,6 @@ class SplitController extends Controller
      */
     public function update(Request $request, JournalRepositoryInterface $repository, TransactionJournal $journal)
     {
-
         if ($this->isOpeningBalance($journal)) {
             return $this->redirectToAccount($journal);
         }
@@ -141,25 +140,27 @@ class SplitController extends Controller
         $files = $request->hasFile('attachments') ? $request->file('attachments') : null;
         // save attachments:
         $this->attachments->saveAttachmentsForModel($journal, $files);
-
         event(new UpdatedTransactionJournal($journal));
-        // update, get events by date and sort DESC
 
         // flash messages
+        // @codeCoverageIgnoreStart
         if (count($this->attachments->getMessages()->get('attachments')) > 0) {
             Session::flash('info', $this->attachments->getMessages()->get('attachments'));
         }
+        // @codeCoverageIgnoreEnd
 
-        $type = strtolower(TransactionJournal::transactionTypeStr($journal));
+        $type = strtolower($journal->transactionTypeStr());
         Session::flash('success', strval(trans('firefly.updated_' . $type, ['description' => e($data['journal_description'])])));
         Preferences::mark();
 
+        // @codeCoverageIgnoreStart
         if (intval($request->get('return_to_edit')) === 1) {
             // set value so edit routine will not overwrite URL:
             Session::put('transactions.edit-split.fromUpdate', true);
 
             return redirect(route('transactions.split.edit', [$journal->id]))->withInput(['return_to_edit' => 1]);
         }
+        // @codeCoverageIgnoreEnd
 
         // redirect to previous URL.
         return redirect($this->getPreviousUri('transactions.edit-split.uri'));
@@ -177,7 +178,6 @@ class SplitController extends Controller
             'journal_source_account_id'      => $request->get('journal_source_account_id'),
             'journal_source_account_name'    => $request->get('journal_source_account_name'),
             'journal_destination_account_id' => $request->get('journal_destination_account_id'),
-            'currency_id'                    => $request->get('currency_id'),
             'what'                           => $request->get('what'),
             'date'                           => $request->get('date'),
             // all custom fields:
@@ -207,19 +207,18 @@ class SplitController extends Controller
      */
     private function arrayFromJournal(Request $request, TransactionJournal $journal): array
     {
-        $sourceAccounts      = TransactionJournal::sourceAccountList($journal);
-        $destinationAccounts = TransactionJournal::destinationAccountList($journal);
+        $sourceAccounts      = $journal->sourceAccountList();
+        $destinationAccounts = $journal->destinationAccountList();
         $array               = [
             'journal_description'            => $request->old('journal_description', $journal->description),
-            'journal_amount'                 => TransactionJournal::amountPositive($journal),
+            'journal_amount'                 => $journal->amountPositive(),
             'sourceAccounts'                 => $sourceAccounts,
             'journal_source_account_id'      => $request->old('journal_source_account_id', $sourceAccounts->first()->id),
             'journal_source_account_name'    => $request->old('journal_source_account_name', $sourceAccounts->first()->name),
             'journal_destination_account_id' => $request->old('journal_destination_account_id', $destinationAccounts->first()->id),
-            'currency_id'                    => $request->old('currency_id', $journal->transaction_currency_id),
             'destinationAccounts'            => $destinationAccounts,
-            'what'                           => strtolower(TransactionJournal::transactionTypeStr($journal)),
-            'date'                           => $request->old('date', $journal->date),
+            'what'                           => strtolower($journal->transactionTypeStr()),
+            'date'                           => $request->old('date', $journal->date->format('Y-m-d')),
             'tags'                           => join(',', $journal->tags->pluck('tag')->toArray()),
 
             // all custom fields:
@@ -251,20 +250,28 @@ class SplitController extends Controller
         /** @var array $transaction */
         foreach ($transactions as $index => $transaction) {
             $set = [
-                'description'              => $transaction['description'],
-                'source_account_id'        => $transaction['source_account_id'],
-                'source_account_name'      => $transaction['source_account_name'],
-                'destination_account_id'   => $transaction['destination_account_id'],
-                'destination_account_name' => $transaction['destination_account_name'],
-                'amount'                   => round($transaction['destination_amount'], 12),
-                'budget_id'                => isset($transaction['budget_id']) ? intval($transaction['budget_id']) : 0,
-                'category'                 => $transaction['category'],
+                'description'                 => $transaction['description'],
+                'source_account_id'           => $transaction['source_account_id'],
+                'source_account_name'         => $transaction['source_account_name'],
+                'destination_account_id'      => $transaction['destination_account_id'],
+                'destination_account_name'    => $transaction['destination_account_name'],
+                'amount'                      => round($transaction['destination_amount'], 12),
+                'budget_id'                   => isset($transaction['budget_id']) ? intval($transaction['budget_id']) : 0,
+                'category'                    => $transaction['category'],
+                'transaction_currency_id'     => $transaction['transaction_currency_id'],
+                'transaction_currency_code'   => $transaction['transaction_currency_code'],
+                'transaction_currency_symbol' => $transaction['transaction_currency_symbol'],
+                'foreign_amount'              => round($transaction['foreign_destination_amount'], 12),
+                'foreign_currency_id'         => $transaction['foreign_currency_id'],
+                'foreign_currency_code'       => $transaction['foreign_currency_code'],
+                'foreign_currency_symbol'     => $transaction['foreign_currency_symbol'],
+
             ];
 
             // set initial category and/or budget:
             if (count($transactions) === 1 && $index === 0) {
-                $set['budget_id'] = TransactionJournal::budgetId($journal);
-                $set['category']  = TransactionJournal::categoryAsString($journal);
+                $set['budget_id'] = $journal->budgetId();
+                $set['category']  = $journal->categoryAsString();
             }
 
             $return[] = $set;
@@ -292,8 +299,12 @@ class SplitController extends Controller
                 'destination_account_id'   => $transaction['destination_account_id'] ?? 0,
                 'destination_account_name' => $transaction['destination_account_name'] ?? '',
                 'amount'                   => round($transaction['amount'] ?? 0, 12),
+                'foreign_amount'           => !isset($transaction['foreign_amount']) ? null : round($transaction['foreign_amount'] ?? 0, 12),
                 'budget_id'                => isset($transaction['budget_id']) ? intval($transaction['budget_id']) : 0,
                 'category'                 => $transaction['category'] ?? '',
+                'transaction_currency_id'  => intval($transaction['transaction_currency_id']),
+                'foreign_currency_id'      => $transaction['foreign_currency_id'] ?? null,
+
             ];
         }
         Log::debug(sprintf('Found %d splits in request data.', count($return)));

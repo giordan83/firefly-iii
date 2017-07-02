@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Generator\Chart\Basic;
 
@@ -81,6 +81,9 @@ class ChartJsGenerator implements GeneratorInterface
             if (isset($set['fill'])) {
                 $currentSet['fill'] = $set['fill'];
             }
+            if (isset($set['currency_symbol'])) {
+                $currentSet['currency_symbol'] = $set['currency_symbol'];
+            }
 
             $chartData['datasets'][] = $currentSet;
         }
@@ -105,7 +108,11 @@ class ChartJsGenerator implements GeneratorInterface
             ],
             'labels'   => [],
         ];
-        $index     = 0;
+
+        // sort by value, keep keys.
+        asort($data);
+
+        $index = 0;
         foreach ($data as $key => $value) {
 
             // make larger than 0

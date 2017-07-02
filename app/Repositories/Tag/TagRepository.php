@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Tag;
 
@@ -47,7 +47,7 @@ class TagRepository implements TagRepositoryInterface
          * Already connected:
          */
         if ($journal->tags()->find($tag->id)) {
-            Log::error(sprintf('Cannot find tag #%d', $tag->id));
+            Log::info(sprintf('Tag #%d is already connected to journal #%d.', $tag->id, $journal->id));
 
             return false;
         }
@@ -66,6 +66,14 @@ class TagRepository implements TagRepositoryInterface
         }
 
         return false;
+    }
+
+    /**
+     * @return int
+     */
+    public function count(): int
+    {
+        return $this->user->tags()->count();
     }
 
     /**
@@ -164,6 +172,16 @@ class TagRepository implements TagRepositoryInterface
     }
 
     /**
+     * @param string $type
+     *
+     * @return Collection
+     */
+    public function getByType(string $type): Collection
+    {
+        return $this->user->tags()->where('tagMode', $type)->orderBy('date', 'ASC')->get();
+    }
+
+    /**
      * @param Tag $tag
      *
      * @return Carbon
@@ -225,6 +243,95 @@ class TagRepository implements TagRepositoryInterface
 
         return $tag;
 
+
+    }
+
+    /**
+     * @param Tag         $tag
+     * @param Carbon|null $start
+     * @param Carbon|null $end
+     *
+     * @return string
+     */
+    public function sumOfTag(Tag $tag, Carbon $start = null, Carbon $end = null): string
+    {
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+
+        if (!is_null($start) && !is_null($end)) {
+            $collector->setRange($start, $end);
+        }
+
+        $collector->setAllAssetAccounts()->setTag($tag);
+        $sum = $collector->getJournals()->sum('transaction_amount');
+
+        return strval($sum);
+    }
+
+    /**
+     * Can a tag become an advance payment?
+     *
+     * @param Tag $tag
+     *
+     * @return bool
+     */
+    public function tagAllowAdvance(Tag $tag): bool
+    {
+        /*
+         * If this tag is a balancing act, and it contains transfers, it cannot be
+         * changed to an advancePayment.
+         */
+
+        if ($tag->tagMode == 'balancingAct' || $tag->tagMode == 'nothing') {
+            foreach ($tag->transactionjournals as $journal) {
+                if ($journal->isTransfer()) {
+                    return false;
+                }
+            }
+        }
+
+        /*
+         * If this tag contains more than one expenses, it cannot become an advance payment.
+         */
+        $count = 0;
+        foreach ($tag->transactionjournals as $journal) {
+            if ($journal->isWithdrawal()) {
+                $count++;
+            }
+        }
+        if ($count > 1) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Can a tag become a balancing act?
+     *
+     * @param Tag $tag
+     *
+     * @return bool
+     */
+    public function tagAllowBalancing(Tag $tag): bool
+    {
+        /*
+         * If has more than two transactions already, cannot become a balancing act:
+         */
+        if ($tag->transactionjournals->count() > 2) {
+            return false;
+        }
+
+        /*
+         * If any transaction is a deposit, cannot become a balancing act.
+         */
+        foreach ($tag->transactionjournals as $journal) {
+            if ($journal->isDeposit()) {
+                return false;
+            }
+        }
+
+        return true;
 
     }
 
@@ -357,8 +464,8 @@ class TagRepository implements TagRepositoryInterface
      */
     private function matchAll(TransactionJournal $journal, Tag $tag): bool
     {
-        $journalSources      = join(',', array_unique(TransactionJournal::sourceAccountList($journal)->pluck('id')->toArray()));
-        $journalDestinations = join(',', array_unique(TransactionJournal::destinationAccountList($journal)->pluck('id')->toArray()));
+        $journalSources      = join(',', array_unique($journal->sourceAccountList()->pluck('id')->toArray()));
+        $journalDestinations = join(',', array_unique($journal->destinationAccountList()->pluck('id')->toArray()));
         $match               = true;
         $journals            = $tag->transactionJournals()->get(['transaction_journals.*']);
 
@@ -369,8 +476,8 @@ class TagRepository implements TagRepositoryInterface
             Log::debug(sprintf('Now existingcomparing new journal #%d to existing journal #%d', $journal->id, $existing->id));
             // $checkAccount is the source_account for a withdrawal
             // $checkAccount is the destination_account for a deposit
-            $existingSources      = join(',', array_unique(TransactionJournal::sourceAccountList($existing)->pluck('id')->toArray()));
-            $existingDestinations = join(',', array_unique(TransactionJournal::destinationAccountList($existing)->pluck('id')->toArray()));
+            $existingSources      = join(',', array_unique($existing->sourceAccountList()->pluck('id')->toArray()));
+            $existingDestinations = join(',', array_unique($existing->destinationAccountList()->pluck('id')->toArray()));
 
             if ($existing->isWithdrawal() && $existingSources !== $journalDestinations) {
                 /*

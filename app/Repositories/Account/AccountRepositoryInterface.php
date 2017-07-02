@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Account;
 
@@ -99,6 +99,11 @@ interface AccountRepositoryInterface
     public function getActiveAccountsByType(array $types): Collection;
 
     /**
+     * @return Account
+     */
+    public function getCashAccount(): Account;
+
+    /**
      * Returns the date of the very last transaction in this account.
      *
      * @param Account $account
@@ -136,5 +141,13 @@ interface AccountRepositoryInterface
      * @return Account
      */
     public function store(array $data): Account;
+
+    /**
+     * @param Account $account
+     * @param array   $data
+     *
+     * @return Account
+     */
+    public function update(Account $account, array $data): Account;
 
 }

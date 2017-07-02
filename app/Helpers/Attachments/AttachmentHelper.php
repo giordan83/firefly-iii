@@ -9,13 +9,16 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Helpers\Attachments;
 
 use Crypt;
 use FireflyIII\Models\Attachment;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\MessageBag;
+use Log;
 use Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -27,6 +30,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 class AttachmentHelper implements AttachmentHelperInterface
 {
 
+    /** @var  Collection */
+    public $attachments;
     /** @var MessageBag */
     public $errors;
     /** @var MessageBag */
@@ -48,6 +53,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         $this->allowedMimes  = (array)config('firefly.allowedMimes');
         $this->errors        = new MessageBag;
         $this->messages      = new MessageBag;
+        $this->attachments   = new Collection;
         $this->uploadDisk    = Storage::disk('upload');
     }
 
@@ -61,6 +67,14 @@ class AttachmentHelper implements AttachmentHelperInterface
         $path = sprintf('%s%sat-%d.data', storage_path('upload'), DIRECTORY_SEPARATOR, intval($attachment->id));
 
         return $path;
+    }
+
+    /**
+     * @return Collection
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
     }
 
     /**
@@ -109,7 +123,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         $md5   = md5_file($file->getRealPath());
         $name  = $file->getClientOriginalName();
         $class = get_class($model);
-        $count = auth()->user()->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
+        $count = $model->user->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
 
         if ($count > 0) {
             $msg = (string)trans('validation.file_already_attached', ['name' => $name]);
@@ -136,7 +150,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         }
 
         $attachment = new Attachment; // create Attachment object.
-        $attachment->user()->associate(auth()->user());
+        $attachment->user()->associate($model->user);
         $attachment->attachable()->associate($model);
         $attachment->md5      = md5_file($file->getRealPath());
         $attachment->filename = $file->getClientOriginalName();
@@ -144,17 +158,21 @@ class AttachmentHelper implements AttachmentHelperInterface
         $attachment->size     = $file->getSize();
         $attachment->uploaded = 0;
         $attachment->save();
+        Log::debug('Created attachment:', $attachment->toArray());
 
         $fileObject = $file->openFile('r');
         $fileObject->rewind();
         $content   = $fileObject->fread($file->getSize());
         $encrypted = Crypt::encrypt($content);
+        Log::debug(sprintf('Full file length is %d and upload size is %d.', strlen($content), $file->getSize()));
+        Log::debug(sprintf('Encrypted content is %d', strlen($encrypted)));
 
         // store it:
         $this->uploadDisk->put($attachment->fileName(), $encrypted);
 
         $attachment->uploaded = 1; // update attachment
         $attachment->save();
+        $this->attachments->push($attachment);
 
         $name = e($file->getClientOriginalName()); // add message:
         $msg  = (string)trans('validation.file_attached', ['name' => $name]);
@@ -187,6 +205,8 @@ class AttachmentHelper implements AttachmentHelperInterface
     }
 
     /**
+     * @codeCoverageIgnore
+     *
      * @param UploadedFile $file
      *
      * @return bool
@@ -217,7 +237,7 @@ class AttachmentHelper implements AttachmentHelperInterface
             return false;
         }
         if (!$this->validSize($file)) {
-            return false;
+            return false; // @codeCoverageIgnore
         }
         if ($this->hasFile($file, $model)) {
             return false;

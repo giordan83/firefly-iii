@@ -15,12 +15,17 @@ use FireflyIII\Support\Search\SearchInterface;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
+/**
+ * Class SearchControllerTest
+ *
+ * @package Tests\Feature\Controllers
+ */
 class SearchControllerTest extends TestCase
 {
 
     /**
      * @covers \FireflyIII\Http\Controllers\SearchController::index
-     * Implement testIndex().
+     * @covers \FireflyIII\Http\Controllers\SearchController::__construct
      */
     public function testIndex()
     {

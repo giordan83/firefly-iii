@@ -9,16 +9,16 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Middleware;
 
 use Closure;
+use Cookie;
 use Illuminate\Support\Facades\Auth;
 use Preferences;
-use Session;
-use Log;
-use Cookie;
+
+
 /**
  * Class RedirectIfTwoFactorAuthenticated
  *

@@ -7,37 +7,62 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Tests\Feature\Controllers;
 
-use FireflyIII\Import\ImportProcedureInterface;
-use FireflyIII\Import\Setup\CsvSetup;
-use Tests\TestCase;
+use FireflyIII\Import\Configurator\CsvConfigurator;
+use FireflyIII\Import\Routine\ImportRoutine;
+use FireflyIII\Models\ImportJob;
+use FireflyIII\Repositories\ImportJob\ImportJobRepositoryInterface;
 use Illuminate\Http\UploadedFile;
+use Tests\TestCase;
 
+/**
+ * Class ImportControllerTest
+ *
+ * @package Tests\Feature\Controllers
+ */
 class ImportControllerTest extends TestCase
 {
+
     /**
-     * @covers \FireflyIII\Http\Controllers\ImportController::complete
+     * @covers \FireflyIII\Http\Controllers\ImportController::__construct
+     * @covers \FireflyIII\Http\Controllers\ImportController::configure
+     * @covers \FireflyIII\Http\Controllers\ImportController::makeConfigurator
      */
-    public function testComplete()
+    public function testConfigure()
     {
+        // mock stuff.
+        $configurator = $this->mock(CsvConfigurator::class);
+        $configurator->shouldReceive('setJob')->once();
+        $configurator->shouldReceive('isJobConfigured')->once()->andReturn(false);
+        $configurator->shouldReceive('getNextView')->once()->andReturn('import.csv.initial');
+        $configurator->shouldReceive('getNextData')->andReturn(['specifics' => [], 'delimiters' => [], 'accounts' => []])->once();
+
+
         $this->be($this->user());
-        $response = $this->get(route('import.complete', ['complete']));
+        $response = $this->get(route('import.configure', ['configure']));
         $response->assertStatus(200);
         $response->assertSee('<ol class="breadcrumb">');
     }
 
     /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::__construct
      * @covers \FireflyIII\Http\Controllers\ImportController::configure
+     * @covers \FireflyIII\Http\Controllers\ImportController::makeConfigurator
      */
-    public function testConfigure()
+    public function testConfigured()
     {
+        // mock stuff.
+        $configurator = $this->mock(CsvConfigurator::class);
+        $configurator->shouldReceive('setJob')->once();
+        $configurator->shouldReceive('isJobConfigured')->once()->andReturn(true);
+
         $this->be($this->user());
         $response = $this->get(route('import.configure', ['configure']));
-        $response->assertStatus(200);
-        $response->assertSee('<ol class="breadcrumb">');
+        $response->assertStatus(302);
+        $response->assertRedirect(route('import.status', ['configure']));
     }
 
     /**
@@ -48,29 +73,42 @@ class ImportControllerTest extends TestCase
         $this->be($this->user());
         $response = $this->get(route('import.download', ['configure']));
         $response->assertStatus(200);
-        $response->assertSee('[]');
-    }
-
-    /**
-     * @covers \FireflyIII\Http\Controllers\ImportController::finished
-     */
-    public function testFinished()
-    {
-        $this->be($this->user());
-        $response = $this->get(route('import.finished', ['finished']));
-        $response->assertStatus(200);
-        $response->assertSee('<ol class="breadcrumb">');
     }
 
     /**
      * @covers \FireflyIII\Http\Controllers\ImportController::index
-     * @covers \FireflyIII\Http\Controllers\ImportController::__construct
      */
     public function testIndex()
     {
         $this->be($this->user());
         $response = $this->get(route('import.index'));
         $response->assertStatus(200);
+        $response->assertSee('<ol class="breadcrumb">');
+    }
+
+    /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::initialize
+     */
+    public function testInitialize()
+    {
+        $repository = $this->mock(ImportJobRepositoryInterface::class);
+        $path       = resource_path('stubs/csv.csv');
+        $file       = new UploadedFile($path, 'upload.csv', filesize($path), 'text/csv', null, true);
+        $configPath = resource_path('stubs/demo-configuration.json');
+        $configFile = new UploadedFile($path, 'configuration.json', filesize($configPath), 'application/json', null, true);
+        $job        = new ImportJob;
+        $job->key   = 'hello';
+
+        $repository->shouldReceive('create')->once()->andReturn($job);
+        $repository->shouldReceive('processFile')->once();
+        $repository->shouldReceive('processConfiguration')->once();
+        $repository->shouldReceive('updateStatus')->once();
+
+        $this->be($this->user());
+        $response = $this->post(route('import.initialize'), ['import_file_type' => 'csv', 'import_file' => $file, 'configuration_file' => $configFile]);
+
+        $response->assertStatus(302);
+        $response->assertRedirect(route('import.configure', ['hello']));
     }
 
     /**
@@ -84,48 +122,56 @@ class ImportControllerTest extends TestCase
     }
 
     /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::json
+     */
+    public function testJsonFinished()
+    {
+        $this->be($this->user());
+        $response = $this->get(route('import.json', ['finished']));
+        $response->assertStatus(200);
+    }
+
+    /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::json
+     */
+    public function testJsonRunning()
+    {
+        $this->be($this->user());
+        $response = $this->get(route('import.json', ['running']));
+        $response->assertStatus(200);
+    }
+
+    /**
      * @covers \FireflyIII\Http\Controllers\ImportController::postConfigure
      */
     public function testPostConfigure()
     {
-        $importer = $this->mock(CsvSetup::class);
-        $importer->shouldReceive('setJob')->once();
-        $importer->shouldReceive('saveImportConfiguration')->once();
+        $configurator = $this->mock(CsvConfigurator::class);
+        $configurator->shouldReceive('setJob')->once();
+        $configurator->shouldReceive('isJobConfigured')->once()->andReturn(false);
+        $configurator->shouldReceive('configureJob')->once()->andReturn(false);
 
-        $data = [];
+
         $this->be($this->user());
-        $response = $this->post(route('import.process-configuration', ['p-configure']), $data);
+        $response = $this->post(route('import.process-configuration', ['running']));
         $response->assertStatus(302);
-        $response->assertRedirect(route('import.settings', ['p-configure']));
+        $response->assertRedirect(route('import.configure', ['running']));
     }
 
     /**
-     * @covers \FireflyIII\Http\Controllers\ImportController::postSettings
+     * @covers \FireflyIII\Http\Controllers\ImportController::postConfigure
      */
-    public function testPostSettings()
+    public function testPostConfigured()
     {
-        $importer = $this->mock(CsvSetup::class);
-        $importer->shouldReceive('setJob')->once();
-        $importer->shouldReceive('storeSettings')->once();
-        $data = [];
-        $this->be($this->user());
-        $response = $this->post(route('import.post-settings', ['p-settings']), $data);
-        $response->assertStatus(302);
-        $response->assertRedirect(route('import.settings', ['p-settings']));
-    }
+        $configurator = $this->mock(CsvConfigurator::class);
+        $configurator->shouldReceive('setJob')->once();
+        $configurator->shouldReceive('isJobConfigured')->once()->andReturn(true);
 
-    /**
-     * @covers \FireflyIII\Http\Controllers\ImportController::settings
-     */
-    public function testSettings()
-    {
-        $importer = $this->mock(CsvSetup::class);
-        $importer->shouldReceive('setJob')->once();
-        $importer->shouldReceive('requireUserSettings')->once()->andReturn(false);
+
         $this->be($this->user());
-        $response = $this->get(route('import.settings', ['settings']));
+        $response = $this->post(route('import.process-configuration', ['running']));
         $response->assertStatus(302);
-        $response->assertRedirect(route('import.complete', ['settings']));
+        $response->assertRedirect(route('import.status', ['running']));
     }
 
     /**
@@ -133,37 +179,51 @@ class ImportControllerTest extends TestCase
      */
     public function testStart()
     {
-        /** @var ImportProcedureInterface $procedure */
-        $procedure = $this->mock(ImportProcedureInterface::class);
+        $importer = $this->mock(ImportRoutine::class);
+        $importer->shouldReceive('setJob')->once();
+        $importer->shouldReceive('run')->once()->andReturn(true);
 
-        $procedure->shouldReceive('runImport');
 
         $this->be($this->user());
-        $response = $this->post(route('import.start', ['complete']));
+        $response = $this->post(route('import.start', ['running']));
+        $response->assertStatus(200);
+    }
+    /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::start
+     * @expectedExceptionMessage Job did not complete succesfully.
+     */
+    public function testStartFailed()
+    {
+        $importer = $this->mock(ImportRoutine::class);
+        $importer->shouldReceive('setJob')->once();
+        $importer->shouldReceive('run')->once()->andReturn(false);
+
+
+        $this->be($this->user());
+        $response = $this->post(route('import.start', ['running']));
+        $response->assertStatus(500);
+    }
+
+    /**
+     * @covers \FireflyIII\Http\Controllers\ImportController::status
+     */
+    public function testStatus()
+    {
+        $this->be($this->user());
+        $response = $this->get(route('import.status', ['running']));
         $response->assertStatus(200);
     }
 
     /**
      * @covers \FireflyIII\Http\Controllers\ImportController::status
-     * Implement testStatus().
      */
-    public function testStatus()
+    public function testStatusNew()
     {
-        // complete
         $this->be($this->user());
-        $response = $this->get(route('import.status', ['complete']));
-        $response->assertStatus(200);
+        $response = $this->get(route('import.status', ['new']));
+        $response->assertStatus(302);
+        $response->assertRedirect(route('import.configure', ['new']));
     }
 
-    /**
-     * @covers \FireflyIII\Http\Controllers\ImportController::upload
-     */
-    public function testUpload()
-    {
-        $path = resource_path('stubs/csv.csv');
-        $file = new UploadedFile($path, 'upload.csv', filesize($path), 'text/csv', null, true);
-        $response = $this->post(route('import.upload'), [], [], ['import_file' => $file], ['Accept' => 'application/json']);
-        $response->assertStatus(302);
-    }
 
 }

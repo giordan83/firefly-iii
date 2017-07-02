@@ -3,6 +3,117 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 
+## [4.6.1] - 2017-07-02
+### Fixed
+- Fixed several small issues all around.
+
+## [4.6.0] - 2017-06-28
+
+### Changed
+- Revamped import routine. Will be buggy.
+
+### Fixed
+- Issue #667, postgresql reported by @skibbipl.
+- Issue #680 by @Xeli
+- Fixed #660
+- Fixes #672, reported by @dzaikos
+- Translation error fixed by 
+- Fix a bug where the balance routine forgot to account for accounts without a currency preference.
+- Various other bugfixes.
+
+## [4.5.0] - 2017-06-07
+
+### Added
+- Better support for multi-currency transactions and display of transactions, accounts and everything. This requires a database overhaul (moving the currency information to specific transactions) so be careful when upgrading.
+- Translations for Spanish and Slovenian.
+- New interface for budget page, ~~stolen from~~ inspired by YNAB.
+- Expanded Docker to work with postgresql as well, thanks to @kressh
+
+### Fixed
+- PostgreSQL support in database upgrade routine (#644, reported by @skibbipl)
+- Frontpage budget chart was off, fix by @nhaarman
+- Was not possible to remove opening balance.
+
+## [4.4.3] - 2017-05-03
+### Added
+- Added support for Slovenian
+- Removed support for Spanish. No translations whatsoever by the guy who requested it.
+- Removed support for Russian. Same thing.
+- Removed support for Croatian. Same thing.
+- Removed support for Chinese Traditional, Hong Kong. Same thing.
+
+### Changed
+- The journal collector, an internal piece of code to collect transactions, now uses a slightly different method of collecting journals. This may cause problems.
+
+### Fixed
+- Issue #638 as reported by [worldworm](https://github.com/worldworm).
+- Possible fix for #624
+
+## [4.4.2] - 2017-04-27
+### Fixed
+- Fixed a bug where the opening balance could not be stored.
+
+## [4.4.1] - 2017-04-27
+
+### Added
+- Support for deployment on Heroku
+
+### Fixed
+- Bug in new-user routine.
+
+## [4.4.0] - 2017-04-23
+### Added
+- Firefly III can now handle foreign currencies better, including some code to get the exchange rate live from the web.
+- Can now make rules for attachments, see #608, as suggested by dzaikos.
+
+### Fixed
+- Fixed #629, reported by forcaeluz
+- Fixed #630, reported by welbert
+- And more various bug fixes.
+
+## [4.3.8] - 2017-04-08
+
+### Added
+- Better overview / show pages.
+- #628, as reported by [xzaz](https://github.com/xzaz).
+- Greatly expanded test coverage
+
+### Fixed
+- #619, as reported by [dfiel](https://github.com/dfiel).
+- #620, as reported by [forcaeluz](https://github.com/forcaeluz).
+- Attempt to fix #624, as reported by [TheSerenin](https://github.com/TheSerenin).
+- Favicon link is relative now, fixed by [welbert](https://github.com/welbert).
+- Some search bugs
+
+## [4.3.7] - 2017-03-06
+### Added
+- Nice user friendly views for empty lists.
+- Extended contribution guidelines.
+- First version of financial report filtered on tags.
+- Suggested monthly savings for piggy banks, by [Zsub](https://github.com/Zsub)
+- Better test coverage.
+
+### Changed
+- Slightly changed tag overview.
+- Consistent icon for bill in list.
+- Slightly changed account overview.
+
+### Removed
+- Removed IDE specific views from .gitignore, issue #598
+
+### Fixed
+- Force key generation during installation.
+- The `date` function takes the fieldname where a date is stored, not the literal date by [Zsub](https://github.com/Zsub)
+- Improved budget frontpage chart, as suggested by [skibbipl](https://github.com/skibbipl)
+- Issue #602 and #607, as reported by [skibbipl](https://github.com/skibbipl) and [dzaikos](https://github.com/dzaikos).
+- Issue #605, as reported by [Zsub](https://github.com/Zsub).
+- Issue #599, as reported by [leander091](https://github.com/leander091).
+- Issue #610, as reported by [skibbipl](https://github.com/skibbipl).
+- Issue #611, as reported by [ragnarkarlsson](https://github.com/ragnarkarlsson).
+- Issue #612, as reported by [ragnarkarlsson](https://github.com/ragnarkarlsson).
+- Issue #614, as reported by [worldworm](https://github.com/worldworm).
+- Various other bug fixes.
+
 ## [4.3.6] - 2017-02-20
 ### Fixed
 - #578, reported by [xpfgsyb](https://github.com/xpfgsyb).
@@ -159,13 +270,6 @@ An intermediate release because something in the Twig and Twigbridge libraries i
 - Updated all email messages.
 - Made some fonts local
 
-
-### Deprecated
-- Initial release.
-
-### Removed
-- Initial release.
-
 ### Fixed
 - Issue #408
 - Various issues with split journals
@@ -173,11 +277,6 @@ An intermediate release because something in the Twig and Twigbridge libraries i
 - Issue #419, thx [schwalberich](https://github.com/schwalberich) 
 - Issue #422, thx [xzaz](https://github.com/xzaz)
 - Various import bugs, such as #416 ([zjean](https://github.com/zjean))
-
-
-### Security
-- Initial release.
-
 
 ## [4.1.7] - 2016-11-19
 ### Added
@@ -301,27 +400,12 @@ An intermediate release because something in the Twig and Twigbridge libraries i
 - New Presidents Choice specific to fix #307
 - Added some trimming (#335)
 
-### Changed
-- Initial release.
-
-### Deprecated
-- Initial release.
-
-### Removed
-- Initial release.
-
 ### Fixed
 - Fixed a bug where incoming transactions would not be properly filtered in several reports.
 - #334 by [cyberkov](https://github.com/cyberkov)
 - #337
 - #336
 - #338 found by [roberthorlings](https://github.com/roberthorlings)
-
-### Security
-- Initial release.
-
-
-
 
 ## [4.0.0] - 2015-09-26
 ### Added

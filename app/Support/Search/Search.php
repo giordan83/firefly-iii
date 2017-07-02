@@ -9,13 +9,14 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support\Search;
 
 
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
 use FireflyIII\Models\Account;
 use FireflyIII\Models\AccountType;
 use FireflyIII\Models\Budget;
@@ -37,6 +38,8 @@ class Search implements SearchInterface
     private $limit = 100;
     /** @var Collection */
     private $modifiers;
+    /** @var  string */
+    private $originalQuery = '';
     /** @var User */
     private $user;
     /** @var array */
@@ -50,7 +53,7 @@ class Search implements SearchInterface
     public function __construct()
     {
         $this->modifiers      = new Collection;
-        $this->validModifiers = config('firefly.search_modifiers');
+        $this->validModifiers = (array) config('firefly.search_modifiers');
     }
 
     /**
@@ -58,7 +61,12 @@ class Search implements SearchInterface
      */
     public function getWordsAsString(): string
     {
-        return join(' ', $this->words);
+        $string = join(' ', $this->words);
+        if (strlen($string) === 0) {
+            return is_string($this->originalQuery) ? $this->originalQuery : '';
+        }
+
+        return $string;
     }
 
     /**
@@ -74,9 +82,10 @@ class Search implements SearchInterface
      */
     public function parseQuery(string $query)
     {
-        $filteredQuery = $query;
-        $pattern       = '/[a-z_]*:[0-9a-z-.]*/i';
-        $matches       = [];
+        $filteredQuery       = $query;
+        $this->originalQuery = $query;
+        $pattern             = '/[a-z_]*:[0-9a-z-.]*/i';
+        $matches             = [];
         preg_match_all($pattern, $query, $matches);
 
         foreach ($matches[0] as $match) {
@@ -199,7 +208,7 @@ class Search implements SearchInterface
             if ($this->hasModifiers()) {
                 $collector->withOpposingAccount()->withCategoryInformation()->withBudgetInformation();
             }
-            $collector->disableInternalFilter();
+            $collector->removeFilter(InternalTransferFilter::class);
             $set   = $collector->getPaginatedJournals()->getCollection();
             $words = $this->words;
 

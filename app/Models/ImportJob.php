@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -42,11 +42,11 @@ class ImportJob extends Model
 
     protected $validStatus
         = [
-            'import_status_never_started', // initial state
-            'import_configuration_saved', // import configuration saved. This step is going to be obsolete.
-            'settings_complete', // aka: ready for import.
-            'import_running', // import currently underway
-            'import_complete', // done with everything
+            'new',
+            'initialized',
+            'configured',
+            'running',
+            'finished',
         ];
 
     /**
@@ -67,12 +67,27 @@ class ImportJob extends Model
     }
 
     /**
+     * @param int    $index
+     * @param string $message
+     *
+     * @return bool
+     */
+    public function addError(int $index, string $message): bool
+    {
+        $extended                     = $this->extended_status;
+        $extended['errors'][$index][] = $message;
+        $this->extended_status        = $extended;
+
+        return true;
+    }
+
+    /**
      * @param int $count
      */
     public function addStepsDone(int $count)
     {
         $status = $this->extended_status;
-        $status['steps_done'] += $count;
+        $status['done']        += $count;
         $this->extended_status = $status;
         $this->save();
 
@@ -83,8 +98,8 @@ class ImportJob extends Model
      */
     public function addTotalSteps(int $count)
     {
-        $status = $this->extended_status;
-        $status['total_steps'] += $count;
+        $status                = $this->extended_status;
+        $status['steps']       += $count;
         $this->extended_status = $status;
         $this->save();
 
@@ -165,7 +180,7 @@ class ImportJob extends Model
         $disk             = Storage::disk('upload');
         $encryptedContent = $disk->get($fileName);
         $content          = Crypt::decrypt($encryptedContent);
-        Log::debug(sprintf('Content size is %d bytes.', $content));
+        Log::debug(sprintf('Content size is %d bytes.', strlen($content)));
 
         return $content;
     }

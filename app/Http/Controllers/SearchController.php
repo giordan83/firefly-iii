@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
@@ -56,7 +56,7 @@ class SearchController extends Controller
         $limit        = 20;
 
         // ui stuff:
-        $subTitle     = '';
+        $subTitle = '';
 
         // query stuff
         $query        = null;

@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
@@ -98,9 +98,13 @@ class AttachmentController extends Controller
      */
     public function download(AttachmentRepositoryInterface $repository, Attachment $attachment)
     {
+
+
         if ($repository->exists($attachment)) {
             $content = $repository->getContent($attachment);
             $quoted  = sprintf('"%s"', addcslashes(basename($attachment->filename), '"\\'));
+
+
 
             /** @var LaravelResponse $response */
             $response = response($content, 200);
@@ -149,6 +153,7 @@ class AttachmentController extends Controller
     {
         $image = 'images/page_green.png';
 
+
         if ($attachment->mime == 'application/pdf') {
             $image = 'images/page_white_acrobat.png';
         }
@@ -176,10 +181,11 @@ class AttachmentController extends Controller
         Preferences::mark();
 
         if (intval($request->get('return_to_edit')) === 1) {
-            // set value so edit routine will not overwrite URL:
+            // @codeCoverageIgnoreStart
             $request->session()->put('attachments.edit.fromUpdate', true);
 
             return redirect(route('attachments.edit', [$attachment->id]))->withInput(['return_to_edit' => 1]);
+            // @codeCoverageIgnoreEnd
         }
 
         // redirect to previous URL.

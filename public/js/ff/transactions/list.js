@@ -41,7 +41,14 @@ function goToMassEdit() {
     var checkedArray = getCheckboxes();
 
     // go to specially crafted URL:
-    window.location.href = 'transactions/mass/edit/' + checkedArray;
+    var bases = document.getElementsByTagName('base');
+    var baseHref = null;
+
+    if (bases.length > 0) {
+        baseHref = bases[0].href;
+    }
+
+    window.location.href = baseHref + '/transactions/mass/edit/' + checkedArray;
     return false;
 }
 
@@ -50,7 +57,13 @@ function goToMassDelete() {
     var checkedArray = getCheckboxes();
 
     // go to specially crafted URL:
-    window.location.href = 'transactions/mass/delete/' + checkedArray;
+    var bases = document.getElementsByTagName('base');
+    var baseHref = null;
+
+    if (bases.length > 0) {
+        baseHref = bases[0].href;
+    }
+    window.location.href = baseHref + '/transactions/mass/delete/' + checkedArray;
     return false;
 }
 
@@ -72,8 +85,8 @@ function countChecked() {
     "use strict";
     var checked = $('.select_all_single:checked').length;
     if (checked > 0) {
-        $('.mass_edit span').text(edit_selected_txt + ' (' + checked + ')')
-        $('.mass_delete span').text(delete_selected_txt + ' (' + checked + ')')
+        $('.mass_edit span').text(edit_selected_txt + ' (' + checked + ')');
+        $('.mass_delete span').text(delete_selected_txt + ' (' + checked + ')');
         $('.mass_button_options').show();
 
     } else {

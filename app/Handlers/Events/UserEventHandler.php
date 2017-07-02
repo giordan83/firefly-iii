@@ -9,14 +9,15 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Handlers\Events;
 
 use FireflyIII\Events\RegisteredUser;
 use FireflyIII\Events\RequestedNewPassword;
+use FireflyIII\Mail\RegisteredUser as RegisteredUserMail;
+use FireflyIII\Mail\RequestedNewPassword as RequestedNewPasswordMail;
 use FireflyIII\Repositories\User\UserRepositoryInterface;
-use Illuminate\Mail\Message;
 use Log;
 use Mail;
 use Swift_TransportException;
@@ -68,14 +69,13 @@ class UserEventHandler
 
         // send email.
         try {
-            Mail::send(
-                ['emails.password-html', 'emails.password-text'], ['url' => $url, 'ip' => $ipAddress], function (Message $message) use ($email) {
-                $message->to($email, $email)->subject('Your password reset request');
-            }
-            );
+            Mail::to($email)->send(new RequestedNewPasswordMail($url, $ipAddress));
+            // @codeCoverageIgnoreStart
         } catch (Swift_TransportException $e) {
             Log::error($e->getMessage());
         }
+
+        // @codeCoverageIgnoreEnd
 
         return true;
     }
@@ -93,22 +93,22 @@ class UserEventHandler
 
         $sendMail = env('SEND_REGISTRATION_MAIL', true);
         if (!$sendMail) {
-            return true;
+            return true; // @codeCoverageIgnore
         }
         // get the email address
         $email     = $event->user->email;
-        $address   = route('index');
+        $uri       = route('index');
         $ipAddress = $event->ipAddress;
+
         // send email.
         try {
-            Mail::send(
-                ['emails.registered-html', 'emails.registered-text'], ['address' => $address, 'ip' => $ipAddress], function (Message $message) use ($email) {
-                $message->to($email, $email)->subject('Welcome to Firefly III!');
-            }
-            );
+            Mail::to($email)->send(new RegisteredUserMail($uri, $ipAddress));
+            // @codeCoverageIgnoreStart
         } catch (Swift_TransportException $e) {
             Log::error($e->getMessage());
         }
+
+        // @codeCoverageIgnoreEnd
 
         return true;
     }

@@ -75,7 +75,7 @@ function lineChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     var chartType = 'line';
 
     drawAChart(URI, container, chartType, options, colorData);
@@ -91,7 +91,7 @@ function doubleYChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     options.scales.yAxes = [
         // y axis 0:
         {
@@ -141,7 +141,7 @@ function doubleYNonStackedChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     options.scales.yAxes = [
         // y axis 0:
         {
@@ -186,9 +186,8 @@ function doubleYNonStackedChart(URI, container) {
  */
 function columnChart(URI, container) {
     "use strict";
-
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     var chartType = 'bar';
 
     drawAChart(URI, container, chartType, options, colorData);
@@ -204,9 +203,11 @@ function stackedColumnChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
+
     options.stacked = true;
     options.scales.xAxes[0].stacked = true;
+    options.scales.yAxes[0].stacked = true;
 
     var chartType = 'bar';
 
@@ -222,7 +223,7 @@ function pieChart(URI, container) {
     "use strict";
 
     var colorData = false;
-    var options = defaultPieOptions;
+    var options = $.extend(true, {}, defaultPieOptions);
     var chartType = 'pie';
 
     drawAChart(URI, container, chartType, options, colorData);

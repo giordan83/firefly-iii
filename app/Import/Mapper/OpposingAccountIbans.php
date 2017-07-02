@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Import\Mapper;
 
@@ -56,7 +56,7 @@ class OpposingAccountIbans implements MapperInterface
         asort($list);
 
         $list = $topList + $list;
-        $list = [0 => trans('csv.do_not_map')] + $list;
+        $list = [0 => trans('csv.map_do_not_map')] + $list;
 
 
         return $list;

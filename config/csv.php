@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 return [
@@ -292,6 +292,7 @@ return [
     // number of example rows:
     'example_rows'     => 5,
     'default_config'   => [
+        'initial-config-complete' => false,
         'has-headers'             => false, // assume
         'date-format'             => 'Ymd', // assume
         'delimiter'               => ',', // assume

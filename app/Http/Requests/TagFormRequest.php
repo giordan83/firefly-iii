@@ -9,7 +9,8 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Http\Requests;
 
 use FireflyIII\Repositories\Tag\TagRepositoryInterface;
@@ -45,11 +46,10 @@ class TagFormRequest extends Request
             $longitude = null;
             $zoomLevel = null;
         }
-        $date = $this->get('date') ?? '';
 
         $data = [
             'tag'         => $this->string('tag'),
-            'date'        => $this->date($date),
+            'date'        => $this->date('date'),
             'description' => $this->string('description'),
             'latitude'    => $latitude,
             'longitude'   => $longitude,

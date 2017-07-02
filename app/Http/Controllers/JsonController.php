@@ -9,7 +9,8 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Http\Controllers;
 
 use Amount;
@@ -17,8 +18,8 @@ use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
 use FireflyIII\Models\AccountType;
+use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
-use FireflyIII\Repositories\Account\AccountTaskerInterface;
 use FireflyIII\Repositories\Bill\BillRepositoryInterface;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
 use FireflyIII\Repositories\Category\CategoryRepositoryInterface;
@@ -114,10 +115,11 @@ class JsonController extends Controller
          * Since both this method and the chart use the exact same data, we can suffice
          * with calling the one method in the bill repository that will get this amount.
          */
-        $amount = $repository->getBillsPaidInRange($start, $end); // will be a negative amount.
-        $amount = bcmul($amount, '-1');
+        $amount   = $repository->getBillsPaidInRange($start, $end); // will be a negative amount.
+        $amount   = bcmul($amount, '-1');
+        $currency = Amount::getDefaultCurrency();
 
-        $data = ['box' => 'bills-paid', 'amount' => Amount::format($amount, false), 'amount_raw' => $amount];
+        $data = ['box' => 'bills-paid', 'amount' => Amount::formatAnything($currency, $amount, false), 'amount_raw' => $amount];
 
         return Response::json($data);
     }
@@ -129,22 +131,22 @@ class JsonController extends Controller
      */
     public function boxBillsUnpaid(BillRepositoryInterface $repository)
     {
-        $start  = session('start', Carbon::now()->startOfMonth());
-        $end    = session('end', Carbon::now()->endOfMonth());
-        $amount = $repository->getBillsUnpaidInRange($start, $end); // will be a positive amount.
-        $data   = ['box' => 'bills-unpaid', 'amount' => Amount::format($amount, false), 'amount_raw' => $amount];
+        $start    = session('start', Carbon::now()->startOfMonth());
+        $end      = session('end', Carbon::now()->endOfMonth());
+        $amount   = $repository->getBillsUnpaidInRange($start, $end); // will be a positive amount.
+        $currency = Amount::getDefaultCurrency();
+        $data     = ['box' => 'bills-unpaid', 'amount' => Amount::formatAnything($currency, $amount, false), 'amount_raw' => $amount];
 
         return Response::json($data);
     }
 
     /**
-     * @param AccountTaskerInterface     $accountTasker
-     * @param AccountRepositoryInterface $repository
-     *
      * @return \Illuminate\Http\JsonResponse
+     * @internal param AccountTaskerInterface $accountTasker
+     * @internal param AccountRepositoryInterface $repository
      *
      */
-    public function boxIn(AccountTaskerInterface $accountTasker, AccountRepositoryInterface $repository)
+    public function boxIn()
     {
         $start = session('start', Carbon::now()->startOfMonth());
         $end   = session('end', Carbon::now()->endOfMonth());
@@ -155,24 +157,31 @@ class JsonController extends Controller
         $cache->addProperty($end);
         $cache->addProperty('box-in');
         if ($cache->has()) {
-            return Response::json($cache->get());
+            return Response::json($cache->get()); // @codeCoverageIgnore
         }
-        $accounts = $repository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET, AccountType::CASH]);
-        $assets   = $repository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]);
-        $amount   = $accountTasker->amountInInPeriod($accounts, $assets, $start, $end);
-        $data     = ['box' => 'in', 'amount' => Amount::format($amount, false), 'amount_raw' => $amount];
+
+        // try a collector for income:
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAllAssetAccounts()->setRange($start, $end)
+                  ->setTypes([TransactionType::DEPOSIT])
+                  ->withOpposingAccount();
+
+        $amount   = strval($collector->getJournals()->sum('transaction_amount'));
+        $currency = Amount::getDefaultCurrency();
+        $data     = ['box' => 'in', 'amount' => Amount::formatAnything($currency, $amount, false), 'amount_raw' => $amount];
         $cache->store($data);
 
         return Response::json($data);
     }
 
     /**
-     * @param AccountTaskerInterface     $accountTasker
-     * @param AccountRepositoryInterface $repository
-     *
      * @return \Symfony\Component\HttpFoundation\Response
+     * @internal param AccountTaskerInterface $accountTasker
+     * @internal param AccountRepositoryInterface $repository
+     *
      */
-    public function boxOut(AccountTaskerInterface $accountTasker, AccountRepositoryInterface $repository)
+    public function boxOut()
     {
         $start = session('start', Carbon::now()->startOfMonth());
         $end   = session('end', Carbon::now()->endOfMonth());
@@ -183,14 +192,18 @@ class JsonController extends Controller
         $cache->addProperty($end);
         $cache->addProperty('box-out');
         if ($cache->has()) {
-            return Response::json($cache->get());
+            return Response::json($cache->get()); // @codeCoverageIgnore
         }
 
-        $accounts = $repository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET, AccountType::CASH]);
-        $assets   = $repository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]);
-        $amount   = $accountTasker->amountOutInPeriod($accounts, $assets, $start, $end);
-
-        $data = ['box' => 'out', 'amount' => Amount::format($amount, false), 'amount_raw' => $amount];
+        // try a collector for expenses:
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAllAssetAccounts()->setRange($start, $end)
+                  ->setTypes([TransactionType::WITHDRAWAL])
+                  ->withOpposingAccount();
+        $amount   = strval($collector->getJournals()->sum('transaction_amount'));
+        $currency = Amount::getDefaultCurrency();
+        $data     = ['box' => 'out', 'amount' => Amount::formatAnything($currency, $amount, false), 'amount_raw' => $amount];
         $cache->store($data);
 
         return Response::json($data);
@@ -287,7 +300,7 @@ class JsonController extends Controller
     {
         $pref = Preferences::get('tour', true);
         if (!$pref) {
-            throw new FireflyException('Cannot find preference for tour. Exit.');
+            throw new FireflyException('Cannot find preference for tour. Exit.'); // @codeCoverageIgnore
         }
         $headers = ['main-content', 'sidebar-toggle', 'account-menu', 'budget-menu', 'report-menu', 'transaction-menu', 'option-menu', 'main-content-end'];
         $steps   = [];
@@ -329,7 +342,9 @@ class JsonController extends Controller
     }
 
     /**
+     * @param JournalRepositoryInterface $repository
      *
+     * @return \Illuminate\Http\JsonResponse
      */
     public function transactionTypes(JournalRepositoryInterface $repository)
     {

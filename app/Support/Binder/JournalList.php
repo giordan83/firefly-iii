@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support\Binder;
 
@@ -37,9 +37,8 @@ class JournalList implements BinderInterface
             $ids = explode(',', $value);
             /** @var \Illuminate\Support\Collection $object */
             $object = TransactionJournal::whereIn('transaction_journals.id', $ids)
-                                        ->expanded()
                                         ->where('transaction_journals.user_id', auth()->user()->id)
-                                        ->get(TransactionJournal::queryFields());
+                                        ->get(['transaction_journals.*',]);
 
             if ($object->count() > 0) {
                 return $object;

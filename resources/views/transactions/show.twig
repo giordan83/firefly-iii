@@ -36,7 +36,9 @@
                         <!-- total amount -->
                         <tr>
                             <td>{{ 'total_amount'|_ }}</td>
-                            <td>{{ journal|formatJournal }}</td>
+                            <td>
+                                {{ journalAmount(journal) }}
+                            </td>
                         </tr>
                         <tr>
                             <td style="width:30%;">{{ trans('list.date') }}</td>
@@ -243,12 +245,12 @@
                             </p>
                         {% endif %}
                         {% if transactions|length == 1 %}
-                        <p>
-                            <i class="fa fa-copy" aria-hidden="true"></i>
-                            <a href="{{ route('transactions.clone', [journal.id]) }}">
-                                {{ ('clone_'~journal.transactionType.type|lower)|_ }}
-                            </a>
-                        </p>
+                            <p>
+                                <i class="fa fa-copy" aria-hidden="true"></i>
+                                <a href="{{ route('transactions.clone', [journal.id]) }}">
+                                    {{ ('clone_'~journal.transactionType.type|lower)|_ }}
+                                </a>
+                            </p>
                         {% endif %}
 
                     </div>
@@ -296,9 +298,7 @@
 
                             </td>
                             <td>
-
-                                {{ formatAnything(journal.transactionCurrency, transaction.source_account_before) }}
-                                &longrightarrow; {{ formatAnything(journal.transactionCurrency, transaction.source_account_after) }}
+                                {{ formatSourceBefore(transaction) }} &rarr; {{ formatSourceAfter(transaction) }}
                             </td>
                             <td>
                                 {% if transaction.destination_account_type == 'Cash account' %}
@@ -309,27 +309,10 @@
 
                             </td>
                             <td>
-
-                                {{ formatAnything(journal.transactionCurrency, transaction.destination_account_before) }}
-                                &longrightarrow; {{ formatAnything(journal.transactionCurrency, transaction.destination_account_after) }}
+                                {{ formatDestinationBefore(transaction) }} &rarr; {{ formatDestinationAfter(transaction) }}
                             </td>
                             <td>
-                                {% if journal.transactiontype.type == 'Deposit' %}
-                                    <!-- deposit, positive amount with correct currency -->
-                                    {{ formatAnything(journal.transactionCurrency, transaction.destination_amount) }}
-
-                                {% endif %}
-                                {% if journal.transactiontype.type == 'Withdrawal' %}
-                                    <!-- withdrawal, negative amount with correct currency -->
-                                    {{ formatAnything(journal.transactionCurrency, transaction.source_amount) }}
-
-                                {% endif %}
-                                {% if journal.transactiontype.type == 'Transfer' %}
-                                    <!-- transfer, positive amount in blue -->
-                                    <span class="text-info">
-                                        {{ formatAnythingPlain(journal.transactionCurrency, transaction.destination_amount) }}
-                                    </span>
-                                {% endif %}
+                                {{ journalAmount(journal) }}
                             </td>
                             <td>
                                 {{ transactionIdBudgets(transaction.source_id) }}

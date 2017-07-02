@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 namespace FireflyIII\Providers;
@@ -52,6 +52,9 @@ class JournalServiceProvider extends ServiceProvider
         $this->registerCollector();
     }
 
+    /**
+     *
+     */
     private function registerCollector()
     {
         $this->app->bind(
@@ -62,13 +65,16 @@ class JournalServiceProvider extends ServiceProvider
                 if ($app->auth->check()) {
                     $collector->setUser(auth()->user());
                 }
-                $collector->startQuery();
+
 
                 return $collector;
             }
         );
     }
 
+    /**
+     *
+     */
     private function registerRepository()
     {
         $this->app->bind(
@@ -86,6 +92,9 @@ class JournalServiceProvider extends ServiceProvider
         );
     }
 
+    /**
+     *
+     */
     private function registerTasker()
     {
         $this->app->bind(
@@ -102,4 +111,5 @@ class JournalServiceProvider extends ServiceProvider
             }
         );
     }
+
 }
