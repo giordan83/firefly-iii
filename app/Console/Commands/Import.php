@@ -3,23 +3,23 @@
  * Import.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Console\Commands;
 
-use FireflyIII\Crud\Account\AccountCrud;
-use FireflyIII\Import\Importer\ImporterInterface;
-use FireflyIII\Import\ImportProcedure;
-use FireflyIII\Import\ImportResult;
-use FireflyIII\Import\ImportStorage;
-use FireflyIII\Import\ImportValidator;
 use FireflyIII\Import\Logging\CommandHandler;
+use FireflyIII\Import\Routine\ImportRoutine;
 use FireflyIII\Models\ImportJob;
+use FireflyIII\Models\TransactionJournal;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
+use Illuminate\Support\MessageBag;
 use Log;
 
 /**
@@ -34,14 +34,14 @@ class Import extends Command
      *
      * @var string
      */
-    protected $description = 'Import stuff into Firefly III.';
+    protected $description = 'This will start a new import.';
 
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'firefly:import {key}';
+    protected $signature = 'firefly:start-import {key}';
 
     /**
      * Create a new command instance.
@@ -53,50 +53,66 @@ class Import extends Command
     }
 
     /**
-     * Execute the console command.
      *
-     * @return mixed
      */
     public function handle()
     {
+        Log::debug('Start start-import command');
         $jobKey = $this->argument('key');
-        $job    = ImportJob::whereKey($jobKey)->first();
+        $job    = ImportJob::where('key', $jobKey)->first();
         if (is_null($job)) {
-            $this->error('This job does not seem to exist.');
+            $this->error(sprintf('No job found with key "%s"', $jobKey));
+
+            return;
+        }
+        if (!$this->isValid($job)) {
+            Log::error('Job is not valid for some reason. Exit.');
 
             return;
         }
 
-        if ($job->status != 'settings_complete') {
-            $this->error('This job is not ready to be imported.');
+        $this->line(sprintf('Going to import job with key "%s" of type "%s"', $job->key, $job->file_type));
 
-            return;
-        }
-
-        $this->line('Going to import job with key "' . $job->key . '" of type ' . $job->file_type);
-
-        // intercept log entries and print them on the command line
         $monolog = Log::getMonolog();
         $handler = new CommandHandler($this);
         $monolog->pushHandler($handler);
 
-        $result = ImportProcedure::run($job);
+        /** @var ImportRoutine $routine */
+        $routine = app(ImportRoutine::class);
+        $routine->setJob($job);
+        $routine->run();
 
-        /**
-         * @var int          $index
-         * @var ImportResult $entry
-         */
-        foreach ($result as $index => $entry) {
-            if ($entry->isSuccess()) {
-                $this->line(sprintf('Line #%d has been imported as transaction #%d.', $index, $entry->journal->id));
-                continue;
-            }
-            $errors = join(', ', $entry->errors->all());
-            $this->error(sprintf('Could not store line #%d, because: %s', $index, $errors));
+        /** @var MessageBag $error */
+        foreach ($routine->errors as $index => $error) {
+            $this->error(sprintf('Error importing line #%d: %s', $index, $error));
         }
 
+        $this->line(sprintf('The import has finished. %d transactions have been imported out of %d records.', $routine->journals->count(), $routine->lines));
 
-        $this->line('The import has completed.');
+        return;
+    }
 
+    /**
+     * @param ImportJob $job
+     *
+     * @return bool
+     */
+    private function isValid(ImportJob $job): bool
+    {
+        if (is_null($job)) {
+            Log::error('This job does not seem to exist.');
+            $this->error('This job does not seem to exist.');
+
+            return false;
+        }
+
+        if ($job->status !== 'configured') {
+            Log::error(sprintf('This job is not ready to be imported (status is %s).', $job->status));
+            $this->error('This job is not ready to be imported.');
+
+            return false;
+        }
+
+        return true;
     }
 }

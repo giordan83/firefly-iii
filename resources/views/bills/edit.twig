@@ -1,4 +1,4 @@
-{% extends "./layout/default.twig" %}
+{% extends "./layout/default" %}
 
 {% block breadcrumbs %}
     {{ Breadcrumbs.renderIfExists(Route.getCurrentRoute.getName, bill) }}
@@ -11,7 +11,7 @@
     <input type="hidden" name="id" value="{{ bill.id }}"/>
 
     <div class="row">
-        <div class="col-lg-6 col-md-12 col-sm-6">
+        <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
             <div class="box box-primary">
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'mandatoryFields'|_ }}</h3>
@@ -21,14 +21,14 @@
                     {{ ExpandedForm.tags('match') }}
                     {{ ExpandedForm.amount('amount_min') }}
                     {{ ExpandedForm.amount('amount_max') }}
-                    {{ ExpandedForm.date('date',bill.date.format('Y-m-d'), {helpText: trans('firefly.bill_date_little_relevance')}) }}
+                    {{ ExpandedForm.date('date',bill.date.format('Y-m-d')) }}
                     {{ ExpandedForm.select('repeat_freq',periods) }}
                 </div>
             </div>
 
 
         </div>
-        <div class="col-lg-6 col-md-12 col-sm-6">
+        <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
             <div class="box">
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'optionalFields'|_ }}</h3>
@@ -60,7 +60,12 @@
 {% endblock %}
 {% block styles %}
     <link href="css/bootstrap-tagsinput.css" type="text/css" rel="stylesheet" media="all">
+    <link href="css/jquery-ui/jquery-ui.structure.min.css" type="text/css" rel="stylesheet" media="all">
+    <link href="css/jquery-ui/jquery-ui.theme.min.css" type="text/css" rel="stylesheet" media="all">
 {% endblock %}
 {% block scripts %}
     <script type="text/javascript" src="js/lib/bootstrap-tagsinput.min.js"></script>
+    <script type="text/javascript" src="js/lib/modernizr-custom.js"></script>
+    <script type="text/javascript" src="js/lib/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="js/ff/accounts/edit.js"></script>
 {% endblock %}

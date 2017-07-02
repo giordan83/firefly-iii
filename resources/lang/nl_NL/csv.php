@@ -3,46 +3,47 @@
  * csv.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
 
-    'import_configure_title' => 'Import configureren',
-    'import_configure_intro' => 'Hier zie je enkele opties voor jouw CSV bestand. Geef aan of je CSV bestand kolomtitels bevat, en hoe het datumveld is opgebouwd. Hier moet je wellicht wat experimenteren. Het scheidingsteken is meestal een ",", maar dat kan ook een ";" zijn. Controleer dit zorgvuldig.',
-    'import_configure_form'  => 'Formulier',
-    'header_help'            => 'Vink hier als de eerste rij kolomtitels bevat',
-    'date_help'              => 'Datum/tijd formaat in jouw CSV bestand. Volg het formaat zoals ze het <a href="https://secure.php.net/manual/en/datetime.createfromformat.php#refsect1-datetime.createfromformat-parameters">op deze pagina</a> uitleggen. Het standaardformaat ziet er zo uit: :dateExample.',
-    'delimiter_help'         => 'Kies het veldscheidingsteken dat in jouw bestand wordt gebruikt. Als je het niet zeker weet, is de komma de beste optie.',
-    'config_file_help'       => 'Voer hier je configuratiebestand in. Als je deze niet hebt, geen zorgen. Latere stappen leggen dit uit.',
-    'import_account_help'    => 'Als jouw CSV bestand geen referenties bevat naar jouw rekening(en), geef dan hier aan om welke rekening het gaat.',
-    'upload_not_writeable'   => 'Het grijze vlak bevat een bestandspad. Dit pad moet schrijfbaar zijn.',
+    // initial config
+    'initial_title'                 => 'Importinstellingen (1/3) - Algemene CVS importinstellingen',
+    'initial_text'                  => 'Om je bestand goed te kunnen importeren moet je deze opties verifiëren.',
+    'initial_box'                   => 'Algemene CVS importinstellingen',
+    'initial_header_help'           => 'Vink hier als de eerste rij kolomtitels bevat.',
+    'initial_date_help'             => 'Datum/tijd formaat in jouw CSV bestand. Volg het formaat zoals ze het <a href="https://secure.php.net/manual/en/datetime.createfromformat.php#refsect1-datetime.createfromformat-parameters">op deze pagina</a> uitleggen. Het standaardformaat ziet er zo uit: :dateExample.',
+    'initial_delimiter_help'        => 'Kies het veldscheidingsteken dat in jouw bestand wordt gebruikt. Als je het niet zeker weet, is de komma de beste optie.',
+    'initial_import_account_help'   => 'Als jouw CSV bestand geen referenties bevat naar jouw rekening(en), geef dan hier aan om welke rekening het gaat.',
+    'initial_submit'                => 'Ga verder met stap 2/3',
 
-    // roles
-    'column_roles_title'     => 'Bepaal de inhoud van elke kolom',
-    'column_roles_text'      => '<p>Firefly III kan niet raden welke soort gegevens er in elke kolom staan. Dat moet je er bij vertellen. Gebruik de voorbeeldgegevens en kies het juiste type uit de dropdown. Staat jouw type er niet bij? <a href="https://github.com/JC5/firefly-iii/issues/new">Open dan een ticket</a>.</p><p>Sommige waarden, zoals rekeningnummers en namen staan wellicht al in jouw Firefly III database. Als je dan het vinkje vinkt, kan je zelf de link leggen tussen wat er in het CSV bestand staat en wat er in de database staat. Hiermee kan je de import sturen.</p>',
-    'column_roles_table'     => 'Tabel',
-    'column_name'            => 'Kolomnaam',
-    'column_example'         => 'Voorbeeldgegevens',
-    'column_role'            => 'Kolomrol',
-    'do_map_value'           => 'Maak een mapping',
-    'column'                 => 'Kolom',
-    'no_example_data'        => 'Geen voorbeeldgegevens',
-    'store_column_roles'     => 'Ga verder met import',
-    'do_not_map'             => '(niet mappen)',
-    'map_title'              => 'Verbind importdata met Firefly III data',
-    'map_text'               => 'In deze tabellen is de linkerwaarde een waarde uit je CSV bestand. Jij moet de link leggen, als mogelijk, met een waarde uit jouw database. Firefly houdt zich hier aan. Als er geen waarde is, selecteer dan ook niets.',
+    // roles config
+    'roles_title'                   => 'Importinstellingen (2/3) - rol van elke kolom definiëren',
+    'roles_text'                    => 'Elke kolom in je CSV-bestand bevat bepaalde gegevens. Gelieve aan te geven wat voor soort gegevens de import-routine kan verwachten. De optie "maak een link" betekent dat u elke vermelding in die kolom linkt aan een waarde uit je database. Een vaak gelinkte kolom is die met de IBAN-code van de tegenrekening. Die kan je dan linken aan de IBAN in jouw database.',
+    'roles_table'                   => 'Tabel',
+    'roles_column_name'             => 'Kolomnaam',
+    'roles_column_example'          => 'Voorbeeldgegevens',
+    'roles_column_role'             => 'Kolomrol',
+    'roles_do_map_value'            => 'Maak een link',
+    'roles_column'                  => 'Kolom',
+    'roles_no_example_data'         => 'Geen voorbeeldgegevens',
+    'roles_submit'                  => 'Ga verder met stap 3/3',
 
-    'field_value'          => 'Veldwaarde',
-    'field_mapped_to'      => 'Gelinkt aan',
-    'store_column_mapping' => 'Mapping opslaan',
+    // map data
+    'map_title'                     => 'Importinstellingen (3/3) - Link importgegevens aan Firefly III-gegevens',
+    'map_text'                      => 'In deze tabellen is de linkerwaarde een waarde uit je CSV bestand. Jij moet de link leggen, als mogelijk, met een waarde uit jouw database. Firefly houdt zich hier aan. Als er geen waarde is, selecteer dan ook niets.',
+    'map_field_value'               => 'Veldwaarde',
+    'map_field_mapped_to'           => 'Gelinkt aan',
+    'map_do_not_map'                => '(niet linken)',
+    'map_submit'                    => 'Start importeren',
 
     // map things.
-
-
     'column__ignore'                => '(negeer deze kolom)',
     'column_account-iban'           => 'Betaalrekening (IBAN)',
     'column_account-id'             => 'Betaalrekening (ID gelijk aan Firefly)',

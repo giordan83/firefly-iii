@@ -3,16 +3,19 @@
  * ToAccountIs.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Rules\Triggers;
 
 use FireflyIII\Models\Account;
 use FireflyIII\Models\TransactionJournal;
+use Log;
 
 /**
  * Class ToAccountIs
@@ -41,8 +44,14 @@ final class ToAccountIs extends AbstractTrigger implements TriggerInterface
     public static function willMatchEverything($value = null)
     {
         if (!is_null($value)) {
-            return false;
+            $res = strval($value) === '';
+            if ($res === true) {
+                Log::error(sprintf('Cannot use %s with "" as a value.', self::class));
+            }
+
+            return $res;
         }
+        Log::error(sprintf('Cannot use %s with a null value.', self::class));
 
         return true;
     }
@@ -57,15 +66,19 @@ final class ToAccountIs extends AbstractTrigger implements TriggerInterface
         $toAccountName = '';
 
         /** @var Account $account */
-        foreach (TransactionJournal::destinationAccountList($journal) as $account) {
+        foreach ($journal->destinationAccountList() as $account) {
             $toAccountName .= strtolower($account->name);
         }
 
         $search = strtolower($this->triggerValue);
 
-        if ($toAccountName == $search) {
+        if ($toAccountName === $search) {
+            Log::debug(sprintf('RuleTrigger ToAccountIs for journal #%d: "%s" is "%s", return true.', $journal->id, $toAccountName, $search));
+
             return true;
         }
+
+        Log::debug(sprintf('RuleTrigger ToAccountIs for journal #%d: "%s" is NOT "%s", return true.', $journal->id, $toAccountName, $search));
 
         return false;
 

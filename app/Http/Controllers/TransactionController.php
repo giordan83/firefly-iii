@@ -3,30 +3,31 @@
  * TransactionController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
 use Carbon\Carbon;
-use ExpandedForm;
-use FireflyIII\Events\TransactionJournalStored;
-use FireflyIII\Events\TransactionJournalUpdated;
-use FireflyIII\Helpers\Attachments\AttachmentHelperInterface;
-use FireflyIII\Http\Requests\JournalFormRequest;
-use FireflyIII\Models\AccountType;
+use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
 use FireflyIII\Models\TransactionJournal;
-use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Journal\JournalRepositoryInterface;
+use FireflyIII\Repositories\Journal\JournalTaskerInterface;
+use FireflyIII\Support\CacheProperties;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Log;
+use Navigation;
 use Preferences;
 use Response;
-use Session;
 use Steam;
-use URL;
 use View;
 
 /**
@@ -37,155 +38,22 @@ use View;
 class TransactionController extends Controller
 {
     /**
-     *
+     * TransactionController constructor.
      */
     public function __construct()
     {
         parent::__construct();
-        View::share('title', trans('firefly.transactions'));
-        View::share('mainTitleIcon', 'fa-repeat');
-    }
-
-    /**
-     * @param string $what
-     *
-     * @return \Illuminate\View\View
-     */
-    public function create(string $what = TransactionType::DEPOSIT)
-    {
-        $crud             = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $budgetRepository = app('FireflyIII\Repositories\Budget\BudgetRepositoryInterface');
-        $piggyRepository  = app('FireflyIII\Repositories\PiggyBank\PiggyBankRepositoryInterface');
-        $what             = strtolower($what);
-        $uploadSize       = min(Steam::phpBytes(ini_get('upload_max_filesize')), Steam::phpBytes(ini_get('post_max_size')));
-        $assetAccounts    = ExpandedForm::makeSelectList($crud->getAccountsByType(['Default account', 'Asset account']));
-        $budgets          = ExpandedForm::makeSelectListWithEmpty($budgetRepository->getActiveBudgets());
-        $piggyBanks       = $piggyRepository->getPiggyBanksWithAmount();
-        $piggies          = ExpandedForm::makeSelectListWithEmpty($piggyBanks);
-        $preFilled        = Session::has('preFilled') ? session('preFilled') : [];
-        $subTitle         = trans('form.add_new_' . $what);
-        $subTitleIcon     = 'fa-plus';
-
-        Session::put('preFilled', $preFilled);
-
-        // put previous url in session if not redirect from store (not "create another").
-        if (session('transactions.create.fromStore') !== true) {
-            $url = URL::previous();
-            Session::put('transactions.create.url', $url);
-        }
-        Session::forget('transactions.create.fromStore');
-        Session::flash('gaEventCategory', 'transactions');
-        Session::flash('gaEventAction', 'create-' . $what);
-
-        asort($piggies);
 
 
-        return view('transactions.create', compact('assetAccounts', 'subTitleIcon', 'uploadSize', 'budgets', 'what', 'piggies', 'subTitle'));
-    }
+        $this->middleware(
+            function ($request, $next) {
+                View::share('title', trans('firefly.transactions'));
+                View::share('mainTitleIcon', 'fa-repeat');
 
-    /**
-     * Shows the form that allows a user to delete a transaction journal.
-     *
-     * @param TransactionJournal $journal
-     *
-     * @return \Illuminate\View\View
-     */
-    public function delete(TransactionJournal $journal)
-    {
-        $what     = strtolower($journal->transaction_type_type ?? $journal->transactionType->type);
-        $subTitle = trans('firefly.delete_' . $what, ['description' => $journal->description]);
-
-        // put previous url in session
-        Session::put('transactions.delete.url', URL::previous());
-        Session::flash('gaEventCategory', 'transactions');
-        Session::flash('gaEventAction', 'delete-' . $what);
-
-        return view('transactions.delete', compact('journal', 'subTitle', 'what'));
-
-
-    }
-
-    /**
-     * @param JournalRepositoryInterface $repository
-     * @param TransactionJournal         $transactionJournal
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function destroy(JournalRepositoryInterface $repository, TransactionJournal $transactionJournal)
-    {
-        $type = TransactionJournal::transactionTypeStr($transactionJournal);
-        Session::flash('success', strval(trans('firefly.deleted_' . $type, ['description' => e($transactionJournal->description)])));
-
-        $repository->delete($transactionJournal);
-
-        Preferences::mark();
-
-        // redirect to previous URL:
-        return redirect(session('transactions.delete.url'));
-    }
-
-    /**
-     * @param TransactionJournal $journal
-     *
-     * @return mixed
-     */
-    public function edit(TransactionJournal $journal)
-    {
-        $count = $journal->transactions()->count();
-        if ($count > 2) {
-            return redirect(route('split.journal.edit', [$journal->id]));
-        }
-        $budgetRepository    = app('FireflyIII\Repositories\Budget\BudgetRepositoryInterface');
-        $piggyRepository     = app('FireflyIII\Repositories\PiggyBank\PiggyBankRepositoryInterface');
-        $crud                = app('FireflyIII\Crud\Account\AccountCrudInterface');
-        $assetAccounts       = ExpandedForm::makeSelectList($crud->getAccountsByType(['Default account', 'Asset account']));
-        $budgetList          = ExpandedForm::makeSelectListWithEmpty($budgetRepository->getActiveBudgets());
-        $piggyBankList       = ExpandedForm::makeSelectListWithEmpty($piggyRepository->getPiggyBanks());
-        $maxFileSize         = Steam::phpBytes(ini_get('upload_max_filesize'));
-        $maxPostSize         = Steam::phpBytes(ini_get('post_max_size'));
-        $uploadSize          = min($maxFileSize, $maxPostSize);
-        $what                = strtolower(TransactionJournal::transactionTypeStr($journal));
-        $subTitle            = trans('breadcrumbs.edit_journal', ['description' => $journal->description]);
-        $sourceAccounts      = TransactionJournal::sourceAccountList($journal);
-        $destinationAccounts = TransactionJournal::destinationAccountList($journal);
-        $preFilled           = [
-            'date'                     => TransactionJournal::dateAsString($journal),
-            'interest_date'            => TransactionJournal::dateAsString($journal, 'interest_date'),
-            'book_date'                => TransactionJournal::dateAsString($journal, 'book_date'),
-            'process_date'             => TransactionJournal::dateAsString($journal, 'process_date'),
-            'category'                 => TransactionJournal::categoryAsString($journal),
-            'budget_id'                => TransactionJournal::budgetId($journal),
-            'piggy_bank_id'            => TransactionJournal::piggyBankId($journal),
-            'tags'                     => join(',', $journal->tags->pluck('tag')->toArray()),
-            'source_account_id'        => $sourceAccounts->first()->id,
-            'source_account_name'      => $sourceAccounts->first()->name,
-            'destination_account_id'   => $destinationAccounts->first()->id,
-            'destination_account_name' => $destinationAccounts->first()->name,
-            'amount'                   => TransactionJournal::amountPositive($journal),
-        ];
-
-        if ($journal->isWithdrawal() && $destinationAccounts->first()->accountType->type == AccountType::CASH) {
-            $preFilled['destination_account_name'] = '';
-        }
-
-        if ($journal->isDeposit() && $sourceAccounts->first()->accountType->type == AccountType::CASH) {
-            $preFilled['source_account_name'] = '';
-        }
-
-
-        Session::flash('preFilled', $preFilled);
-        Session::flash('gaEventCategory', 'transactions');
-        Session::flash('gaEventAction', 'edit-' . $what);
-
-        // put previous url in session if not redirect from store (not "return_to_edit").
-        if (session('transactions.edit.fromUpdate') !== true) {
-            Session::put('transactions.edit.url', URL::previous());
-        }
-        Session::forget('transactions.edit.fromUpdate');
-
-        return view('transactions.edit', compact('journal', 'uploadSize', 'assetAccounts', 'what', 'budgetList', 'piggyBankList', 'subTitle'))->with(
-            'data', $preFilled
+                return $next($request);
+            }
         );
+
     }
 
     /**
@@ -193,20 +61,83 @@ class TransactionController extends Controller
      * @param JournalRepositoryInterface $repository
      * @param string                     $what
      *
+     * @param string                     $moment
+     *
      * @return View
      */
-    public function index(Request $request, JournalRepositoryInterface $repository, string $what)
+    public function index(Request $request, JournalRepositoryInterface $repository, string $what, string $moment = '')
     {
-        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
+        // default values:
         $subTitleIcon = config('firefly.transactionIconsByWhat.' . $what);
         $types        = config('firefly.transactionTypesByWhat.' . $what);
-        $subTitle     = trans('firefly.title_' . $what);
-        $page         = intval($request->get('page'));
-        $journals     = $repository->getJournals($types, $page, $pageSize);
+        $page         = intval($request->get('page')) == 0 ? 1 : intval($request->get('page'));
+        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
+        $count        = 0;
+        $loop         = 0;
+        $range        = Preferences::get('viewRange', '1M')->data;
+        $start        = null;
+        $end          = null;
+        $periods      = new Collection;
+        $path         = '/transactions/' . $what;
 
-        $journals->setPath('transactions/' . $what);
+        // prep for "all" view.
+        if ($moment === 'all') {
+            $subTitle = trans('firefly.all_' . $what);
+            $first    = $repository->first();
+            $start    = $first->date ?? new Carbon;
+            $end      = new Carbon;
+            $path = '/transactions/'.$what.'/all/';
+        }
 
-        return view('transactions.index', compact('subTitle', 'what', 'subTitleIcon', 'journals'));
+        // prep for "specific date" view.
+        if (strlen($moment) > 0 && $moment !== 'all') {
+            $start    = new Carbon($moment);
+            $end      = Navigation::endOfPeriod($start, $range);
+            $subTitle = trans(
+                'firefly.title_' . $what . '_between',
+                ['start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+            $periods  = $this->getPeriodOverview($what);
+        }
+
+        // prep for current period
+        if (strlen($moment) === 0) {
+            $start    = clone session('start', Navigation::startOfPeriod(new Carbon, $range));
+            $end      = clone session('end', Navigation::endOfPeriod(new Carbon, $range));
+            $periods  = $this->getPeriodOverview($what);
+            $subTitle = trans(
+                'firefly.title_' . $what . '_between',
+                ['start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+        }
+        // grab journals, but be prepared to jump a period back to get the right ones:
+        Log::info('Now at transaction loop start.');
+        while ($count === 0 && $loop < 3) {
+            $loop++;
+            Log::info('Count is zero, search for journals.');
+            /** @var JournalCollectorInterface $collector */
+            $collector = app(JournalCollectorInterface::class);
+            $collector->setAllAssetAccounts()->setRange($start, $end)->setTypes($types)->setLimit($pageSize)->setPage($page)->withOpposingAccount();
+            $collector->removeFilter(InternalTransferFilter::class);
+            $journals = $collector->getPaginatedJournals();
+            $journals->setPath($path);
+            $count = $journals->getCollection()->count();
+            if ($count === 0 && $loop < 3) {
+                $start->subDay();
+                $start = Navigation::startOfPeriod($start, $range);
+                $end   = Navigation::endOfPeriod($start, $range);
+                Log::info(sprintf('Count is still zero, go back in time to "%s" and "%s"!', $start->format('Y-m-d'), $end->format('Y-m-d')));
+            }
+        }
+
+        if ($moment != 'all' && $loop > 1) {
+            $subTitle = trans(
+                'firefly.title_' . $what . '_between',
+                ['start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+        }
+
+        return view('transactions.index', compact('subTitle', 'what', 'subTitleIcon', 'journals', 'periods', 'start', 'end', 'moment'));
 
     }
 
@@ -222,12 +153,12 @@ class TransactionController extends Controller
         $date = new Carbon($request->get('date'));
         if (count($ids) > 0) {
             $order = 0;
+            $ids   = array_unique($ids);
             foreach ($ids as $id) {
                 $journal = $repository->find(intval($id));
-                if ($journal && $journal->date->format('Y-m-d') == $date->format('Y-m-d')) {
-                    $journal->order = $order;
+                if ($journal && $journal->date->isSameDay($date)) {
+                    $repository->setOrder($journal, $order);
                     $order++;
-                    $journal->save();
                 }
             }
         }
@@ -238,21 +169,21 @@ class TransactionController extends Controller
     }
 
     /**
-     * @param TransactionJournal         $journal
-     * @param JournalRepositoryInterface $repository
+     * @param TransactionJournal     $journal
+     * @param JournalTaskerInterface $tasker
      *
      * @return View
      */
-    public function show(TransactionJournal $journal, JournalRepositoryInterface $repository)
+    public function show(TransactionJournal $journal, JournalTaskerInterface $tasker)
     {
-        $events       = $repository->getPiggyBankEvents($journal);
-        $transactions = $repository->getTransactions($journal);
+        if ($this->isOpeningBalance($journal)) {
+            return $this->redirectToAccount($journal);
+        }
+
+        $events       = $tasker->getPiggyBankEvents($journal);
+        $transactions = $tasker->getTransactionsOverview($journal);
         $what         = strtolower($journal->transaction_type_type ?? $journal->transactionType->type);
         $subTitle     = trans('firefly.' . $what) . ' "' . e($journal->description) . '"';
-
-        if ($transactions->count() > 2) {
-            return view('split.journals.show', compact('journal', 'events', 'subTitle', 'what', 'transactions'));
-        }
 
         return view('transactions.show', compact('journal', 'events', 'subTitle', 'what', 'transactions'));
 
@@ -260,117 +191,79 @@ class TransactionController extends Controller
     }
 
     /**
-     * @param JournalFormRequest         $request
-     * @param JournalRepositoryInterface $repository
+     * @param string $what
      *
-     * @return \Illuminate\Http\RedirectResponse
+     * @return Collection
+     * @throws FireflyException
      */
-    public function store(JournalFormRequest $request, JournalRepositoryInterface $repository)
+    private function getPeriodOverview(string $what): Collection
     {
-        $att         = app('FireflyIII\Helpers\Attachments\AttachmentHelperInterface');
-        $doSplit     = intval($request->get('split_journal')) === 1;
-        $journalData = $request->getJournalData();
+        $repository = app(JournalRepositoryInterface::class);
+        $first      = $repository->first();
+        $start      = $first->date ?? new Carbon;
+        $range      = Preferences::get('viewRange', '1M')->data;
+        $start      = Navigation::startOfPeriod($start, $range);
+        $end        = Navigation::endOfX(new Carbon, $range);
+        $entries    = new Collection;
+        $types      = config('firefly.transactionTypesByWhat.' . $what);
 
-        // store the journal only, flash the rest.
-        if ($doSplit) {
-            $journal = $repository->storeJournal($journalData);
-            $journal->completed = false;
-            $journal->save();
+        // properties for cache
+        $cache = new CacheProperties;
+        $cache->addProperty($start);
+        $cache->addProperty($end);
+        $cache->addProperty($what);
+        $cache->addProperty('transaction-list-entries');
 
-            // store attachments:
-            $att->saveAttachmentsForModel($journal);
+        if ($cache->has()) {
+            return $cache->get(); // @codeCoverageIgnore
+        }
 
-            // flash errors
-            if (count($att->getErrors()->get('attachments')) > 0) {
-                Session::flash('error', $att->getErrors()->get('attachments'));
+        Log::debug(sprintf('Going to get period expenses and incomes between %s and %s.', $start->format('Y-m-d'), $end->format('Y-m-d')));
+        while ($end >= $start) {
+            Log::debug('Loop start!');
+            $end        = Navigation::startOfPeriod($end, $range);
+            $currentEnd = Navigation::endOfPeriod($end, $range);
+
+            // count journals without budget in this period:
+            /** @var JournalCollectorInterface $collector */
+            $collector = app(JournalCollectorInterface::class);
+            $collector->setAllAssetAccounts()->setRange($end, $currentEnd)->withOpposingAccount()->setTypes($types);
+            $collector->removeFilter(InternalTransferFilter::class);
+            $set      = $collector->getJournals();
+            $sum      = $set->sum('transaction_amount');
+            $journals = $set->count();
+            $dateStr  = $end->format('Y-m-d');
+            $dateName = Navigation::periodShow($end, $range);
+            $array    = [
+                'string'      => $dateStr,
+                'name'        => $dateName,
+                'count'       => $journals,
+                'spent'       => 0,
+                'earned'      => 0,
+                'transferred' => 0,
+                'date'        => clone $end,
+            ];
+            Log::debug(sprintf('What is %s', $what));
+            switch ($what) {
+                case 'withdrawal':
+                    $array['spent'] = $sum;
+                    break;
+                case 'deposit':
+                    $array['earned'] = $sum;
+                    break;
+                case 'transfers':
+                case 'transfer':
+                    $array['transferred'] = Steam::positive($sum);
+                    break;
+
             }
-            // flash messages
-            if (count($att->getMessages()->get('attachments')) > 0) {
-                Session::flash('info', $att->getMessages()->get('attachments'));
-            }
-
-            Session::put('journal-data', $journalData);
-
-            return redirect(route('split.journal.create', [$journal->id]));
+            $entries->push($array);
+            $end = Navigation::subtractPeriod($end, $range, 1);
         }
+        Log::debug('End of loop');
+        $cache->store($entries);
 
-
-        // if not withdrawal, unset budgetid.
-        if ($journalData['what'] != strtolower(TransactionType::WITHDRAWAL)) {
-            $journalData['budget_id'] = 0;
-        }
-
-        $journal = $repository->store($journalData);
-        $att->saveAttachmentsForModel($journal);
-
-        // flash errors
-        if (count($att->getErrors()->get('attachments')) > 0) {
-            Session::flash('error', $att->getErrors()->get('attachments'));
-        }
-        // flash messages
-        if (count($att->getMessages()->get('attachments')) > 0) {
-            Session::flash('info', $att->getMessages()->get('attachments'));
-        }
-
-        event(new TransactionJournalStored($journal, intval($journalData['piggy_bank_id'])));
-
-        Session::flash('success', strval(trans('firefly.stored_journal', ['description' => e($journal->description)])));
-        Preferences::mark();
-
-        if (intval($request->get('create_another')) === 1) {
-            // set value so create routine will not overwrite URL:
-            Session::put('transactions.create.fromStore', true);
-
-            return redirect(route('transactions.create', [$request->input('what')]))->withInput();
-        }
-
-        // redirect to previous URL.
-        return redirect(session('transactions.create.url'));
-
+        return $entries;
     }
 
-
-    /**
-     * @param JournalFormRequest         $request
-     * @param JournalRepositoryInterface $repository
-     * @param AttachmentHelperInterface  $att
-     * @param TransactionJournal         $journal
-     *
-     * @return $this|\Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
-     */
-    public function update(JournalFormRequest $request, JournalRepositoryInterface $repository, AttachmentHelperInterface $att, TransactionJournal $journal)
-    {
-        $journalData = $request->getJournalData();
-        $repository->update($journal, $journalData);
-
-        // save attachments:
-        $att->saveAttachmentsForModel($journal);
-
-        // flash errors
-        if (count($att->getErrors()->get('attachments')) > 0) {
-            Session::flash('error', $att->getErrors()->get('attachments'));
-        }
-        // flash messages
-        if (count($att->getMessages()->get('attachments')) > 0) {
-            Session::flash('info', $att->getMessages()->get('attachments'));
-        }
-
-        event(new TransactionJournalUpdated($journal));
-        // update, get events by date and sort DESC
-
-        $type = strtolower($journal->transaction_type_type ?? TransactionJournal::transactionTypeStr($journal));
-        Session::flash('success', strval(trans('firefly.updated_' . $type, ['description' => e($journalData['description'])])));
-        Preferences::mark();
-
-        if (intval($request->get('return_to_edit')) === 1) {
-            // set value so edit routine will not overwrite URL:
-            Session::put('transactions.edit.fromUpdate', true);
-
-            return redirect(route('transactions.edit', [$journal->id]))->withInput(['return_to_edit' => 1]);
-        }
-
-        // redirect to previous URL.
-        return redirect(session('transactions.edit.url'));
-
-    }
 }

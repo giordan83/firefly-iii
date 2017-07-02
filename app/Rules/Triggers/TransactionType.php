@@ -3,15 +3,18 @@
  * TransactionType.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Rules\Triggers;
 
 use FireflyIII\Models\TransactionJournal;
+use Log;
 
 /**
  * Class TransactionType
@@ -42,6 +45,7 @@ final class TransactionType extends AbstractTrigger implements TriggerInterface
         if (!is_null($value)) {
             return false;
         }
+        Log::error(sprintf('Cannot use %s with a null value.', self::class));
 
         return true;
     }
@@ -56,9 +60,13 @@ final class TransactionType extends AbstractTrigger implements TriggerInterface
         $type   = !is_null($journal->transaction_type_type) ? $journal->transaction_type_type : strtolower($journal->transactionType->type);
         $search = strtolower($this->triggerValue);
 
-        if ($type == $search) {
+        if ($type === $search) {
+            Log::debug(sprintf('RuleTrigger TransactionType for journal #%d: "%s" is "%s". Return true', $journal->id, $type, $search));
+
             return true;
         }
+
+        Log::debug(sprintf('RuleTrigger TransactionType for journal #%d: "%s" is NOT "%s". Return false', $journal->id, $type, $search));
 
         return false;
     }

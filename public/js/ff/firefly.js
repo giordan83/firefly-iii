@@ -1,9 +1,28 @@
-/* globals token, dateRangeConfig, $, */
+/*
+ * firefly.js
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
+/** global: moment, accountingConfig, dateRangeConfig, accounting, currencySymbol, mon_decimal_point, frac_digits, showFullList, showOnlyTop, mon_thousands_sep */
+
+
 $(function () {
     "use strict";
 
+    configAccounting(currencySymbol);
+
+    $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-Token': $('meta[name="_token"]').attr('content')
+                    }
+                });
+
     // when you click on a currency, this happens:
-    $('.currency-option').click(currencySelect);
+    $('.currency-option').on('click', currencySelect);
 
     var ranges = {};
     ranges[dateRangeConfig.currentPeriod] = [moment(dateRangeConfig.ranges.current[0]), moment(dateRangeConfig.ranges.current[1])];
@@ -40,20 +59,18 @@ $(function () {
             $.post(dateRangeConfig.URL, {
                 start: start.format('YYYY-MM-DD'),
                 end: end.format('YYYY-MM-DD'),
-                label: label,
-                _token: token
+                label: label
             }).done(function () {
-                console.log('Succesfully sent new date range [' + start.format('YYYY-MM-DD') + '-' + end.format('YYYY-MM-DD') + '].');
                 window.location.reload(true);
             }).fail(function () {
-                console.log('Could not send new date range.');
                 alert('Could not change date range');
-
             });
-
-            //alert('A date range was chosen: ' + start.format('YYYY-MM-DD') + ' to ' + end.format('YYYY-MM-DD'));
         }
     );
+
+
+    // trigger list thing
+    listLengthInitial();
 
 });
 
@@ -87,24 +104,52 @@ function currencySelect(e) {
     $('#' + spanId).text(symbol);
 
     // close the menu (hack hack)
-    $('#' + menuID).click();
+    $('#' + menuID).dropdown('toggle');
 
 
     return false;
 }
 
+function configAccounting(customCurrency) {
+
 // Settings object that controls default parameters for library methods:
-accounting.settings = {
-    currency: {
-        symbol: currencySymbol,   // default currency symbol is '$'
-        format: "%s %v", // controls output: %s = symbol, %v = value/number (can be object: see below)
-        decimal: mon_decimal_point,  // decimal point separator
-        thousand: mon_thousands_sep,  // thousands separator
-        precision: frac_digits   // decimal places
-    },
-    number: {
-        precision: 0,  // default precision on numbers is 0
-        thousand: ",",
-        decimal: "."
+    accounting.settings = {
+        currency: {
+            symbol: customCurrency,   // default currency symbol is '$'
+            format: accountingConfig, // controls output: %s = symbol, %v = value/number (can be object: see below)
+            decimal: mon_decimal_point,  // decimal point separator
+            thousand: mon_thousands_sep,  // thousands separator
+            precision: frac_digits   // decimal places
+        },
+        number: {
+            precision: 0,  // default precision on numbers is 0
+            thousand: ",",
+            decimal: "."
+        }
+    };
+}
+
+function listLengthInitial() {
+    "use strict";
+    $('.overListLength').hide();
+    $('.listLengthTrigger').unbind('click').click(triggerList)
+}
+
+function triggerList(e) {
+    "use strict";
+    var link = $(e.target);
+    var table = link.parent().parent().parent().parent();
+    if (table.attr('data-hidden') === 'no') {
+        // hide all elements, return false.
+        table.find('.overListLength').hide();
+        table.attr('data-hidden', 'yes');
+        link.text(showFullList);
+        return false;
     }
-};
+    // show all, return false
+    table.find('.overListLength').show();
+    table.attr('data-hidden', 'no');
+    link.text(showOnlyTop);
+
+    return false;
+}

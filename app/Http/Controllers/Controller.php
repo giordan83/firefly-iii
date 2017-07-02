@@ -3,23 +3,27 @@
  * Controller.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
-use App;
-use Auth;
-use Carbon\Carbon;
+use FireflyConfig;
+use FireflyIII\Models\AccountType;
+use FireflyIII\Models\Transaction;
+use FireflyIII\Models\TransactionJournal;
+use FireflyIII\Models\TransactionType;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
-use NumberFormatter;
-use Preferences;
+use Session;
+use URL;
 use View;
 
 /**
@@ -47,65 +51,88 @@ class Controller extends BaseController
         View::share('hideCategories', false);
         View::share('hideBills', false);
         View::share('hideTags', false);
+        $isDemoSite = FireflyConfig::get('is_demo_site', config('firefly.configuration.is_demo_site'))->data;
+        View::share('IS_DEMO_SITE', $isDemoSite);
+        View::share('DEMO_USERNAME', env('DEMO_USERNAME', ''));
+        View::share('DEMO_PASSWORD', env('DEMO_PASSWORD', ''));
 
-        if (Auth::check()) {
-            $pref = Preferences::get('language', env('DEFAULT_LANGUAGE', 'en_US'));
-            $lang = $pref->data;
+        // translations:
+        $this->middleware(
+            function ($request, $next) {
+                $this->monthFormat       = (string)trans('config.month');
+                $this->monthAndDayFormat = (string)trans('config.month_and_day');
+                $this->dateTimeFormat    = (string)trans('config.date_time');
 
-            App::setLocale($lang);
-            Carbon::setLocale(substr($lang, 0, 2));
-            $locale = explode(',', trans('config.locale'));
-            $locale = array_map('trim', $locale);
+                return $next($request);
+            }
+        );
 
-            setlocale(LC_TIME, $locale);
-            setlocale(LC_MONETARY, $locale);
-
-            // save some formats:
-            $this->monthFormat       = (string)trans('config.month');
-            $this->monthAndDayFormat = (string)trans('config.month_and_day');
-            $this->dateTimeFormat    = (string)trans('config.date_time');
-
-            // change localeconv to a new array:
-            $numberFormatter = numfmt_create($lang, NumberFormatter::CURRENCY);
-            $localeconv      = [
-                'mon_decimal_point' => $numberFormatter->getSymbol($numberFormatter->getAttribute(NumberFormatter::DECIMAL_SEPARATOR_SYMBOL)),
-                'mon_thousands_sep' => $numberFormatter->getSymbol($numberFormatter->getAttribute(NumberFormatter::MONETARY_GROUPING_SEPARATOR_SYMBOL)),
-                'frac_digits'       => $numberFormatter->getAttribute(NumberFormatter::MAX_FRACTION_DIGITS),
-            ];
-            View::share('monthFormat', $this->monthFormat);
-            View::share('monthAndDayFormat', $this->monthAndDayFormat);
-            View::share('dateTimeFormat', $this->dateTimeFormat);
-            View::share('language', $lang);
-            View::share('localeconv', $localeconv);
-        }
     }
 
     /**
-     * Take the array as returned by CategoryRepositoryInterface::spentPerDay and CategoryRepositoryInterface::earnedByDay
-     * and sum up everything in the array in the given range.
+     * Functionality:
      *
-     * @param Carbon $start
-     * @param Carbon $end
-     * @param array  $array
+     * - If the $identifier contains the word "delete" then a remembered uri with the text "/show/" in it will not be returned but instead the index (/)
+     *   will be returned.
+     * - If the remembered uri contains "javascript/" the remembered uri will not be returned but instead the index (/) will be returned.
+     *
+     * @param string $identifier
      *
      * @return string
      */
-    protected function getSumOfRange(Carbon $start, Carbon $end, array $array)
+    protected function getPreviousUri(string $identifier): string
     {
-        $sum          = '0';
-        $currentStart = clone $start; // to not mess with the original one
-        $currentEnd   = clone $end; // to not mess with the original one
-
-        while ($currentStart <= $currentEnd) {
-            $date = $currentStart->format('Y-m-d');
-            if (isset($array[$date])) {
-                $sum = bcadd($sum, $array[$date]);
-            }
-            $currentStart->addDay();
+        $uri = strval(session($identifier));
+        if (!(strpos($identifier, 'delete') === false) && !(strpos($uri, '/show/') === false)) {
+            $uri = route('index');
+        }
+        if (!(strpos($uri, 'javascript') === false)) {
+            $uri = route('index');
         }
 
-        return $sum;
+        return $uri;
     }
 
+    /**
+     * @param TransactionJournal $journal
+     *
+     * @return bool
+     */
+    protected function isOpeningBalance(TransactionJournal $journal): bool
+    {
+        return $journal->transactionTypeStr() === TransactionType::OPENING_BALANCE;
+    }
+
+    /**
+     * @param TransactionJournal $journal
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    protected function redirectToAccount(TransactionJournal $journal)
+    {
+        $valid        = [AccountType::DEFAULT, AccountType::ASSET];
+        $transactions = $journal->transactions;
+        /** @var Transaction $transaction */
+        foreach ($transactions as $transaction) {
+            $account = $transaction->account;
+            if (in_array($account->accountType->type, $valid)) {
+                return redirect(route('accounts.show', [$account->id]));
+            }
+
+        }
+        // @codeCoverageIgnoreStart
+        Session::flash('error', strval(trans('firefly.cannot_redirect_to_account')));
+
+        return redirect(route('index'));
+        // @codeCoverageIgnoreEnd
+    }
+
+    /**
+     * @param string $identifier
+     */
+    protected function rememberPreviousUri(string $identifier)
+    {
+        Session::put($identifier, URL::previous());
+    }
 
 }

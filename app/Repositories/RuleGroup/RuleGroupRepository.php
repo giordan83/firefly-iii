@@ -3,11 +3,13 @@
  * RuleGroupRepository.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\RuleGroup;
 
@@ -29,16 +31,6 @@ class RuleGroupRepository implements RuleGroupRepositoryInterface
     private $user;
 
     /**
-     * BillRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
-
-    /**
      * @return int
      */
     public function count(): int
@@ -47,8 +39,8 @@ class RuleGroupRepository implements RuleGroupRepositoryInterface
     }
 
     /**
-     * @param RuleGroup $ruleGroup
-     * @param RuleGroup $moveTo
+     * @param RuleGroup      $ruleGroup
+     * @param RuleGroup|null $moveTo
      *
      * @return bool
      */
@@ -78,11 +70,66 @@ class RuleGroupRepository implements RuleGroupRepositoryInterface
     }
 
     /**
+     * @param int $ruleGroupId
+     *
+     * @return RuleGroup
+     */
+    public function find(int $ruleGroupId): RuleGroup
+    {
+        $group = $this->user->ruleGroups()->find($ruleGroupId);
+        if (is_null($group)) {
+            return new RuleGroup;
+        }
+
+        return $group;
+    }
+
+    /**
      * @return Collection
      */
     public function get(): Collection
     {
         return $this->user->ruleGroups()->orderBy('order', 'ASC')->get();
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return Collection
+     */
+    public function getActiveGroups(User $user): Collection
+    {
+        return $user->ruleGroups()->where('rule_groups.active', 1)->orderBy('order', 'ASC')->get(['rule_groups.*']);
+    }
+
+    /**
+     * @param RuleGroup $group
+     *
+     * @return Collection
+     */
+    public function getActiveStoreRules(RuleGroup $group): Collection
+    {
+        return $group->rules()
+                     ->leftJoin('rule_triggers', 'rules.id', '=', 'rule_triggers.rule_id')
+                     ->where('rule_triggers.trigger_type', 'user_action')
+                     ->where('rule_triggers.trigger_value', 'store-journal')
+                     ->where('rules.active', 1)
+                     ->get(['rules.*']);
+    }
+
+    /**
+     * @param RuleGroup $group
+     *
+     * @return Collection
+     */
+    public function getActiveUpdateRules(RuleGroup $group): Collection
+    {
+        return $group->rules()
+                     ->leftJoin('rule_triggers', 'rules.id', '=', 'rule_triggers.rule_id')
+                     ->where('rule_triggers.trigger_type', 'user_action')
+                     ->where('rule_triggers.trigger_value', 'update-journal')
+                     ->where('rules.active', 1)
+                     ->get(['rules.*']);
     }
 
     /**
@@ -214,6 +261,14 @@ class RuleGroupRepository implements RuleGroupRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return RuleGroup
@@ -224,7 +279,7 @@ class RuleGroupRepository implements RuleGroupRepositoryInterface
 
         $newRuleGroup = new RuleGroup(
             [
-                'user_id'     => $data['user_id'],
+                'user_id'     => $this->user->id,
                 'title'       => $data['title'],
                 'description' => $data['description'],
                 'order'       => ($order + 1),

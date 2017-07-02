@@ -3,11 +3,13 @@
  * PasswordController.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Auth;
 
@@ -20,22 +22,17 @@ use Illuminate\Support\Facades\Password;
 
 
 /**
+ * @codeCoverageIgnore
+ *
  * Class PasswordController
  *
  * @package FireflyIII\Http\Controllers\Auth
+ * @method getEmailSubject()
+ * @method getSendResetLinkEmailSuccessResponse(string $response)
+ * @method getSendResetLinkEmailFailureResponse(string $response)
  */
 class PasswordController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Password Reset Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller is responsible for handling password reset requests
-    | and uses a simple trait to include this behavior. You're free to
-    | explore this trait and override any methods you wish to tweak.
-    |
-    */
 
     use ResetsPasswords;
 
@@ -52,10 +49,11 @@ class PasswordController extends Controller
 
     /**
      * Send a reset link to the given user.
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity) // it's 7 but ok
      *
      * @param  \Illuminate\Http\Request $request
      *
-     * @return \Illuminate\Http\Response
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function sendResetLinkEmail(Request $request)
     {

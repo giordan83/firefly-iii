@@ -1,4 +1,4 @@
-{% extends "./layout/default.twig" %}
+{% extends "./layout/default" %}
 
 {% block breadcrumbs %}
     {{ Breadcrumbs.renderIfExists }}
@@ -8,11 +8,11 @@
 
 
 
-    {% include 'partials/boxes.twig' %}
+    {% include 'partials.boxes' %}
 
     <div class="row">
         <div class="col-lg-8 col-md-12 col-sm-12">
-            <!-- ACCOUNTS -->
+            {# ACCOUNTS #}
             <div class="box box-primary">
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'yourAccounts'|_ }}</h3>
@@ -22,13 +22,13 @@
                 </div>
             </div>
 
-            <!-- BUDGETS -->
+            {# BUDGETS #}
             <div class="box">
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'budgetsAndSpending'|_ }}</h3>
                 </div>
                 <div class="box-body">
-                    <canvas id="budgets-chart" style="width:100%;" height="400"></canvas>
+                    <canvas id="budgets-chart" style="width:100%;height:400px;" height="400" width="100%"></canvas>
                 </div>
             </div>
             <!-- CATEGORIES -->
@@ -38,22 +38,26 @@
 
                 </div>
                 <div class="box-body">
-                    <canvas id="categories-chart" style="width:100%;" height="400"></canvas>
+                    <canvas id="categories-chart" style="width:100%;height:400px;" height="400" width="100%"></canvas>
                 </div>
             </div>
         </div>
         <div class="col-lg-4 col-md-6 col-sm-12">
+            {% if billCount > 0 %}
+                <!-- BILLS -->
+                <div class="box">
+                    <div class="box-header with-border">
+                        <h3 class="box-title">{{ 'bills'|_ }}</h3>
 
-            <!-- BILLS -->
-            <div class="box">
-                <div class="box-header with-border">
-                    <h3 class="box-title">{{ 'bills'|_ }}</h3>
+                    </div>
+                    <div class="box-body">
+                        <div style="width:100%;margin:0 auto;">
+                            <canvas id="bills-chart" style="width:100%;height:200px;" height="200"></canvas>
+                        </div>
 
+                    </div>
                 </div>
-                <div class="box-body">
-                    <canvas id="bills-chart" style="width:100%;" height="250"></canvas>
-                </div>
-            </div>
+            {% endif %}
 
             <!-- TRANSACTIONS -->
             {% for data in transactions %}
@@ -78,9 +82,21 @@
 
 
                     </div>
-                    <div class="box-body no-padding">
-                        {% include 'list.journals-tiny' with {'transactions': data[0],'account': data[1]} %}
-                    </div>
+
+                    {% if data[0].count > 0 %}
+                        <div class="box-body no-padding">
+                            {% include 'list.journals-tiny' with {'transactions': data[0],'account': data[1]} %}
+                        </div>
+                    {% else %}
+                        <div class="box-body">
+                            <p>
+                                <em>
+                                    {{ trans('firefly.no_transactions_account', {name: data[1].name}) }}
+                                </em>
+                            </p>
+                        </div>
+                    {% endif %}
+
                     <div class="box-footer clearfix">
                         <a class="btn btn-sm btn-default btn-flat pull-right"
                            href="{{ route('accounts.show',data[1].id) }}">{{ (data[1]|balance)|formatAmountPlain }}</a>
@@ -98,122 +114,23 @@
 
                 </div>
                 <div class="box-body">
-                    <canvas id="expense-accounts-chart" style="width:100%;" height="400"></canvas>
+                    <canvas id="expense-accounts-chart" style="width:100%;height:400px;" height="400" width="100%"></canvas>
                 </div>
             </div>
+            <!-- OPTIONAL REVENUE ACCOUNTS -->
+            {% if showDepositsFrontpage %}
+                <div class="box">
+                    <div class="box-header with-border">
+                        <h3 class="box-title">{{ 'revenue_accounts'|_ }}</h3>
+
+                    </div>
+                    <div class="box-body">
+                        <canvas id="revenue-accounts-chart" style="width:100%;height:400px;" height="400" width="100%"></canvas>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
-    <div class="row">
-        <div class="col-lg-6 col-sm-12 col-md-12">
-            <!-- SAVINGS -->
-            <div class="box">
-                <div class="box-header with-border">
-                    <h3 class="box-title">{{ 'savings'|_ }}</h3>
-
-                </div>
-                <div class="box-body">
-                    {% if savings|length == 0 %}
-                        <p class="small"><em>{{ 'markAsSavingsToContinue'|_ }}</em></p>
-                    {% else %}
-                        {% for account in savings %}
-                            <div class="row">
-                                <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12"><h5><a
-                                                href="{{ route('accounts.show', account.id) }}">{{ account.name }}</a></h5>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <!-- start -->
-                                <div class="col-lg-2 col-md-2 col-sm-3 col-xs-4">{{ account.startBalance|formatAmount }}</div>
-                                <!-- bar -->
-                                <div class="col-lg-8 col-md-8 col-sm-6 col-xs-4">
-                                    {% if account.difference < 0 %}
-                                        <!-- green (100-pct), then red (pct) -->
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-success" style="width: {{ 100 - account.percentage }}%">
-                                                {% if account.percentage >= 20 %}
-                                                    {{ account.difference|formatAmountPlain }}
-                                                {% endif %}
-                                            </div>
-                                            <div class="progress-bar progress-bar-danger" style="width: {{ account.percentage }}%">
-                                                {% if account.percentage < 20 %}
-                                                    {{ account.difference|formatAmountPlain }}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    {% else %}
-                                        <!-- green (pct), then blue (100-pct) -->
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-success" style="width: {{ account.percentage }}%">
-                                                {% if account.percentage >= 20 %}
-                                                    {{ account.difference|formatAmountPlain }}
-                                                {% endif %}
-                                            </div>
-                                            <div class="progress-bar progress-bar-info" style="width: {{ 100 - account.percentage }}%">
-                                                {% if account.percentage < 20 %}
-                                                    {{ account.difference|formatAmountPlain }}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    {% endif %}
-
-                                </div>
-                                <!-- end -->
-                                <div class="col-lg-2 col-md-2 col-sm-3 col-xs-4">{{ account.endBalance|formatAmount }}</div>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                <div class="box-footer clearfix">
-                    <span class="pull-right">{{ 'sum'|_ }}: {{ savingsTotal|formatAmount }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6 col-sm-12 col-md-12">
-            <!-- PIGGY BANKS -->
-            <div class="box">
-                <div class="box-header with-border">
-                    <h3 class="box-title">{{ 'piggyBanks'|_ }}</h3>
-
-                </div>
-                <div class="box-body">
-                    {% if piggyBankAccounts|length  == 0 %}
-                        <p class="small"><em>{{ 'createPiggyToContinue'|_ }}</em></p>
-                    {% else %}
-                        {% for account in piggyBankAccounts %}
-                            <div class="row">
-                                <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12"><h5><a
-                                                href="{{ route('accounts.show', account.id) }}">{{ account.name }}</a></h5>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <!-- start -->
-                                <div class="col-lg-2 col-md-2 col-sm-3 col-xs-4">{{ account.startBalance|formatAmount }}</div>
-                                <!-- bar -->
-                                <div class="col-lg-8 col-md-8 col-sm-6 col-xs-4">
-
-                                    <div class="progress">
-                                        <div class="progress-bar progress-bar-info progress-bar" style="width: {{ 100 - account.percentage }}%">
-                                            {% if account.percentage >= 20 %}
-                                                {{ account.piggyBalance|formatAmountPlain }} {{ 'divided'|_ }}
-                                            {% endif %}
-                                        </div>
-                                        <div class="progress-bar progress-bar-success progress-bar" style="width: {{ account.percentage }}%">
-                                            {% if account.percentage < 20 %}
-                                                {{ account.difference|formatAmountPlain }} {{ 'toDivide'|_ }}
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- end -->
-                                <div class="col-lg-2 col-md-2 col-sm-3 col-xs-4">{{ account.piggyBalance|formatAmount }}</div>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
 
 {% endblock %}
 {% block scripts %}
@@ -225,9 +142,16 @@
         {% else %}
         showTour = false;
         {% endif %}
+        var billCount = {{ billCount }};
+
+        // uri's of charts:
+        var accountFrontpageUri = '{{ route('chart.account.frontpage') }}';
+        var accountRevenueUri = '{{ route('chart.account.revenue') }}';
+        var accountExpenseUri = '{{ route('chart.account.expense') }}';
     </script>
 
     <script type="text/javascript" src="js/lib/Chart.bundle.min.js"></script>
+    <script type="text/javascript" src="js/ff/charts.defaults.js"></script>
     <script type="text/javascript" src="js/ff/charts.js"></script>
     <script type="text/javascript" src="js/ff/index.js"></script>
 {% endblock %}

@@ -1,16 +1,20 @@
 <?php
-declare(strict_types = 1);
-
-
+/**
+ * auth.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
 
 return [
-
-    'allow_register' => true,
-    'defaults'       => [
+    'defaults'  => [
         'guard'     => 'web',
         'passwords' => 'users',
     ],
-    'guards'         => [
+    'guards'    => [
         'web' => [
             'driver'   => 'session',
             'provider' => 'users',
@@ -21,20 +25,17 @@ return [
             'provider' => 'users',
         ],
     ],
-
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
             'model'  => FireflyIII\User::class,
         ],
     ],
-
     'passwords' => [
         'users' => [
             'provider' => 'users',
-            'email'    => 'emails.password',
             'table'    => 'password_resets',
-            'expire'   => 60,
+            'expire'   => 120,
         ],
     ],
 

@@ -3,23 +3,27 @@
  * BillRepository.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Bill;
 
 use Carbon\Carbon;
 use DB;
 use FireflyIII\Models\Bill;
+use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Models\TransactionType;
+use FireflyIII\Support\CacheProperties;
 use FireflyIII\User;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Log;
 use Navigation;
 
 /**
@@ -32,16 +36,6 @@ class BillRepository implements BillRepositoryInterface
 
     /** @var User */
     private $user;
-
-    /**
-     * BillRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @param Bill $bill
@@ -62,7 +56,7 @@ class BillRepository implements BillRepositoryInterface
      *
      * @return Bill
      */
-    public function find(int $billId) : Bill
+    public function find(int $billId): Bill
     {
         $bill = $this->user->bills()->find($billId);
         if (is_null($bill)) {
@@ -79,7 +73,7 @@ class BillRepository implements BillRepositoryInterface
      *
      * @return Bill
      */
-    public function findByName(string $name) : Bill
+    public function findByName(string $name): Bill
     {
         $bills = $this->user->bills()->get(['bills.*']);
 
@@ -104,44 +98,9 @@ class BillRepository implements BillRepositoryInterface
                           ->get(
                               [
                                   'bills.*',
-                                  DB::raw('((`bills`.`amount_min` + `bills`.`amount_max`) / 2) as `expectedAmount`'),
+                                  DB::raw('((bills.amount_min + bills.amount_max) / 2) AS expectedAmount'),
                               ]
                           )->sortBy('name');
-
-        return $set;
-    }
-
-    /**
-     * Returns all journals connected to these bills in the given range. Amount paid
-     * is stored in "journalAmount" as a negative number.
-     *
-     * @param Collection $bills
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return Collection
-     */
-    public function getAllJournalsInRange(Collection $bills, Carbon $start, Carbon $end): Collection
-    {
-        $ids = $bills->pluck('id')->toArray();
-
-        $set = $this->user->transactionjournals()
-                          ->leftJoin(
-                              'transactions', function (JoinClause $join) {
-                              $join->on('transactions.transaction_journal_id', '=', 'transaction_journals.id')->where('transactions.amount', '<', 0);
-                          }
-                          )
-                          ->whereIn('bill_id', $ids)
-                          ->before($end)
-                          ->after($start)
-                          ->groupBy('transaction_journals.bill_id')
-                          ->get(
-                              [
-                                  'transaction_journals.bill_id',
-                                  'transaction_journals.id',
-                                  DB::raw('SUM(`transactions`.`amount`) as `journalAmount`'),
-                              ]
-                          );
 
         return $set;
     }
@@ -173,22 +132,38 @@ class BillRepository implements BillRepositoryInterface
      */
     public function getBillsForAccounts(Collection $accounts): Collection
     {
-        $ids = $accounts->pluck('id')->toArray();
-        $set = $this->user->bills()
-                          ->leftJoin(
-                              'transaction_journals', function (JoinClause $join) {
-                              $join->on('transaction_journals.bill_id', '=', 'bills.id')->whereNull('transaction_journals.deleted_at');
-                          }
-                          )
-                          ->leftJoin(
-                              'transactions', function (JoinClause $join) {
-                              $join->on('transaction_journals.id', '=', 'transactions.transaction_journal_id')->where('transactions.amount', '<', 0);
-                          }
-                          )
-                          ->whereIn('transactions.account_id', $ids)
-                          ->whereNull('transaction_journals.deleted_at')
-                          ->groupBy('bills.id')
-                          ->get(['bills.*']);
+        $fields = ['bills.id',
+                   'bills.created_at',
+                   'bills.updated_at',
+                   'bills.deleted_at',
+                   'bills.user_id',
+                   'bills.name',
+                   'bills.match',
+                   'bills.amount_min',
+                   'bills.amount_max',
+                   'bills.date',
+                   'bills.repeat_freq',
+                   'bills.skip',
+                   'bills.automatch',
+                   'bills.active',
+                   'bills.name_encrypted',
+                   'bills.match_encrypted'];
+        $ids    = $accounts->pluck('id')->toArray();
+        $set    = $this->user->bills()
+                             ->leftJoin(
+                                 'transaction_journals', function (JoinClause $join) {
+                                 $join->on('transaction_journals.bill_id', '=', 'bills.id')->whereNull('transaction_journals.deleted_at');
+                             }
+                             )
+                             ->leftJoin(
+                                 'transactions', function (JoinClause $join) {
+                                 $join->on('transaction_journals.id', '=', 'transactions.transaction_journal_id')->where('transactions.amount', '<', 0);
+                             }
+                             )
+                             ->whereIn('transactions.account_id', $ids)
+                             ->whereNull('transaction_journals.deleted_at')
+                             ->groupBy($fields)
+                             ->get($fields);
 
         $set = $set->sortBy(
             function (Bill $bill) {
@@ -204,7 +179,8 @@ class BillRepository implements BillRepositoryInterface
 
     /**
      * Get the total amount of money paid for the users active bills in the date range given.
-     * This amount will be negative (they're expenses).
+     * This amount will be negative (they're expenses). This method is equal to
+     * getBillsUnpaidInRange. So the debug comments are gone.
      *
      * @param Carbon $start
      * @param Carbon $end
@@ -213,29 +189,21 @@ class BillRepository implements BillRepositoryInterface
      */
     public function getBillsPaidInRange(Carbon $start, Carbon $end): string
     {
-        $amount = '0';
-        $bills  = $this->getActiveBills();
-
+        $bills = $this->getActiveBills();
+        $sum   = '0';
         /** @var Bill $bill */
         foreach ($bills as $bill) {
-            $ranges = $this->getRanges($bill, $start, $end);
-
-            foreach ($ranges as $range) {
-                $paid      = $bill->transactionjournals()
-                                  ->before($range['end'])
-                                  ->after($range['start'])
-                                  ->leftJoin(
-                                      'transactions', function (JoinClause $join) {
-                                      $join->on('transactions.transaction_journal_id', '=', 'transaction_journals.id')->where('transactions.amount', '<', 0);
-                                  }
-                                  )
-                                  ->first([DB::raw('SUM(`transactions`.`amount`) as `sum_amount`')]);
-                $sumAmount = $paid->sum_amount ?? '0';
-                $amount    = bcadd($amount, $sumAmount);
+            /** @var Collection $set */
+            $set = $bill->transactionJournals()->after($start)->before($end)->get(['transaction_journals.*']);
+            if ($set->count() > 0) {
+                $journalIds = $set->pluck('id')->toArray();
+                $amount     = strval(Transaction::whereIn('transaction_journal_id', $journalIds)->where('amount', '<', 0)->sum('amount'));
+                $sum        = bcadd($sum, $amount);
+                Log::debug(sprintf('Total > 0, so add to sum %f, which becomes %f', $amount, $sum));
             }
         }
 
-        return $amount;
+        return $sum;
     }
 
     /**
@@ -248,85 +216,42 @@ class BillRepository implements BillRepositoryInterface
      */
     public function getBillsUnpaidInRange(Carbon $start, Carbon $end): string
     {
-        $amount = '0';
-        $bills  = $this->getActiveBills();
-
+        $bills = $this->getActiveBills();
+        $sum   = '0';
         /** @var Bill $bill */
         foreach ($bills as $bill) {
-            $ranges   = $this->getRanges($bill, $start, $end);
-            $paidBill = '0';
-            foreach ($ranges as $range) {
-                $paid      = $bill->transactionjournals()
-                                  ->before($range['end'])
-                                  ->after($range['start'])
-                                  ->leftJoin(
-                                      'transactions', function (JoinClause $join) {
-                                      $join->on('transactions.transaction_journal_id', '=', 'transaction_journals.id')->where('transactions.amount', '>', 0);
-                                  }
-                                  )
-                                  ->first([DB::raw('SUM(`transactions`.`amount`) as `sum_amount`')]);
-                $sumAmount = $paid->sum_amount ?? '0';
-                $paidBill  = bcadd($sumAmount, $paidBill);
-            }
-            if ($paidBill == 0) {
-                $amount = bcadd($amount, $bill->expectedAmount);
+            Log::debug(sprintf('Now at bill #%d (%s)', $bill->id, $bill->name));
+            $dates = $this->getPayDatesInRange($bill, $start, $end);
+            $count = $bill->transactionJournals()->after($start)->before($end)->count();
+            $total = $dates->count() - $count;
+
+            Log::debug(sprintf('Dates = %d, journalCount = %d, total = %d', $dates->count(), $count, $total));
+
+            if ($total > 0) {
+
+                $average = bcdiv(bcadd($bill->amount_max, $bill->amount_min), '2');
+                $multi   = bcmul($average, strval($total));
+                $sum     = bcadd($sum, $multi);
+                Log::debug(sprintf('Total > 0, so add to sum %f, which becomes %f', $multi, $sum));
             }
         }
 
-        return $amount;
+        return $sum;
     }
 
     /**
-     * This method also returns the amount of the journal in "journalAmount"
-     * for easy access.
-     *
      * @param Bill $bill
-     *
-     * @param int  $page
-     * @param int  $pageSize
-     *
-     * @return LengthAwarePaginator|Collection
-     */
-    public function getJournals(Bill $bill, int $page, int $pageSize = 50): LengthAwarePaginator
-    {
-        $offset    = ($page - 1) * $pageSize;
-        $query     = $bill->transactionjournals()
-                          ->expanded()
-                          ->sortCorrectly();
-        $count     = $query->count();
-        $set       = $query->take($pageSize)->offset($offset)->get(TransactionJournal::queryFields());
-        $paginator = new LengthAwarePaginator($set, $count, $pageSize, $page);
-
-        return $paginator;
-    }
-
-    /**
-     * Get all journals that were recorded on this bill between these dates.
-     *
-     * @param Bill   $bill
-     * @param Carbon $start
-     * @param Carbon $end
-     *
-     * @return Collection
-     */
-    public function getJournalsInRange(Bill $bill, Carbon $start, Carbon $end): Collection
-    {
-        return $bill->transactionjournals()->before($end)->after($start)->get();
-    }
-
-    /**
-     * @param $bill
      *
      * @return string
      */
-    public function getOverallAverage($bill): string
+    public function getOverallAverage(Bill $bill): string
     {
-        $journals = $bill->transactionjournals()->get();
+        $journals = $bill->transactionJournals()->get();
         $sum      = '0';
         $count    = strval($journals->count());
         /** @var TransactionJournal $journal */
         foreach ($journals as $journal) {
-            $sum = bcadd($sum, TransactionJournal::amountPositive($journal));
+            $sum = bcadd($sum, $journal->amountPositive());
         }
         $avg = '0';
         if ($journals->count() > 0) {
@@ -334,6 +259,78 @@ class BillRepository implements BillRepositoryInterface
         }
 
         return $avg;
+    }
+
+    /**
+     * The "paid dates" list is a list of dates of transaction journals that are linked to this bill.
+     *
+     * @param Bill   $bill
+     * @param Carbon $start
+     * @param Carbon $end
+     *
+     * @return Collection
+     */
+    public function getPaidDatesInRange(Bill $bill, Carbon $start, Carbon $end): Collection
+    {
+        $dates = $bill->transactionJournals()->before($end)->after($start)->get(['transaction_journals.date'])->pluck('date');
+
+        return $dates;
+
+    }
+
+    /**
+     * Between start and end, tells you on which date(s) the bill is expected to hit.
+     *
+     * @param Bill   $bill
+     * @param Carbon $start
+     * @param Carbon $end
+     *
+     * @return Collection
+     */
+    public function getPayDatesInRange(Bill $bill, Carbon $start, Carbon $end): Collection
+    {
+        $set = new Collection;
+        Log::debug(sprintf('Now at bill "%s" (%s)', $bill->name, $bill->repeat_freq));
+
+        /*
+         * Start at 2016-10-01, see when we expect the bill to hit:
+         */
+        $currentStart = clone $start;
+        Log::debug(sprintf('First currentstart is %s', $currentStart->format('Y-m-d')));
+
+        while ($currentStart <= $end) {
+            Log::debug(sprintf('Currentstart is now %s.', $currentStart->format('Y-m-d')));
+            $nextExpectedMatch = $this->nextDateMatch($bill, $currentStart);
+            Log::debug(sprintf('Next Date match after %s is %s', $currentStart->format('Y-m-d'), $nextExpectedMatch->format('Y-m-d')));
+            /*
+             * If nextExpectedMatch is after end, we continue:
+             */
+            if ($nextExpectedMatch > $end) {
+                Log::debug(
+                    sprintf('nextExpectedMatch %s is after %s, so we skip this bill now.', $nextExpectedMatch->format('Y-m-d'), $end->format('Y-m-d'))
+                );
+                break;
+            }
+            // add to set
+            $set->push(clone $nextExpectedMatch);
+            Log::debug(sprintf('Now %d dates in set.', $set->count()));
+
+            // add day if necessary.
+            $nextExpectedMatch->addDay();
+
+            Log::debug(sprintf('Currentstart (%s) has become %s.', $currentStart->format('Y-m-d'), $nextExpectedMatch->format('Y-m-d')));
+
+            $currentStart = clone $nextExpectedMatch;
+        }
+        $simple = $set->each(
+            function (Carbon $date) {
+                return $date->format('Y-m-d');
+            }
+        );
+        Log::debug(sprintf('Found dates between %s and %s:', $start->format('Y-m-d'), $end->format('Y-m-d')), $simple->toArray());
+
+
+        return $set;
     }
 
     /**
@@ -351,54 +348,12 @@ class BillRepository implements BillRepositoryInterface
 
         $journals = new Collection;
         if (count($ids) > 0) {
-            $journals = $this->user->transactionjournals()->transactionTypes([TransactionType::WITHDRAWAL])->whereIn('transaction_journals.id', $ids)->get(
+            $journals = $this->user->transactionJournals()->transactionTypes([TransactionType::WITHDRAWAL])->whereIn('transaction_journals.id', $ids)->get(
                 ['transaction_journals.*']
             );
         }
 
         return $journals;
-    }
-
-    /**
-     * Every bill repeats itself weekly, monthly or yearly (or whatever). This method takes a date-range (usually the view-range of Firefly itself)
-     * and returns date ranges that fall within the given range; those ranges are the bills expected. When a bill is due on the 14th of the month and
-     * you give 1st and the 31st of that month as argument, you'll get one response, matching the range of your bill.
-     *
-     * @param Bill   $bill
-     * @param Carbon $start
-     * @param Carbon $end
-     *
-     * @return array
-     */
-    public function getRanges(Bill $bill, Carbon $start, Carbon $end): array
-    {
-        $startOfBill = Navigation::startOfPeriod($start, $bill->repeat_freq);
-
-
-        // all periods of this bill up until the current period:
-        $billStarts = [];
-        while ($startOfBill < $end) {
-
-            $endOfBill = Navigation::endOfPeriod($startOfBill, $bill->repeat_freq);
-
-            $billStarts[] = [
-                'start' => clone $startOfBill,
-                'end'   => clone $endOfBill,
-            ];
-            // actually the next one:
-            $startOfBill = Navigation::addPeriod($startOfBill, $bill->repeat_freq, $bill->skip);
-
-        }
-        // for each
-        $validRanges = [];
-        foreach ($billStarts as $dateEntry) {
-            if ($dateEntry['end'] > $start && $dateEntry['start'] < $end) {
-                // count transactions for bill in this range (not relevant yet!):
-                $validRanges[] = $dateEntry;
-            }
-        }
-
-        return $validRanges;
     }
 
     /**
@@ -409,7 +364,7 @@ class BillRepository implements BillRepositoryInterface
      */
     public function getYearAverage(Bill $bill, Carbon $date): string
     {
-        $journals = $bill->transactionjournals()
+        $journals = $bill->transactionJournals()
                          ->where('date', '>=', $date->year . '-01-01')
                          ->where('date', '<=', $date->year . '-12-31')
                          ->get();
@@ -417,7 +372,7 @@ class BillRepository implements BillRepositoryInterface
         $count    = strval($journals->count());
         /** @var TransactionJournal $journal */
         foreach ($journals as $journal) {
-            $sum = bcadd($sum, TransactionJournal::amountPositive($journal));
+            $sum = bcadd($sum, $journal->amountPositive());
         }
         $avg = '0';
         if ($journals->count() > 0) {
@@ -428,67 +383,87 @@ class BillRepository implements BillRepositoryInterface
     }
 
     /**
-     * @param Bill $bill
+     * Given a bill and a date, this method will tell you at which moment this bill expects its next
+     * transaction. Whether or not it is there already, is not relevant.
+     *
+     * @param Bill   $bill
+     * @param Carbon $date
      *
      * @return \Carbon\Carbon
      */
-    public function lastFoundMatch(Bill $bill): Carbon
+    public function nextDateMatch(Bill $bill, Carbon $date): Carbon
     {
-        $last = $bill->transactionjournals()->orderBy('date', 'DESC')->first();
-        if ($last) {
-            return $last->date;
+        $cache = new CacheProperties;
+        $cache->addProperty($bill->id);
+        $cache->addProperty('nextDateMatch');
+        $cache->addProperty($date);
+        if ($cache->has()) {
+            return $cache->get(); // @codeCoverageIgnore
+        }
+        // find the most recent date for this bill NOT in the future. Cache this date:
+        $start = clone $bill->date;
+        Log::debug('nextDateMatch: Start is ' . $start->format('Y-m-d'));
+
+        while ($start < $date) {
+            Log::debug(sprintf('$start (%s) < $date (%s)', $start->format('Y-m-d'), $date->format('Y-m-d')));
+            $start = Navigation::addPeriod($start, $bill->repeat_freq, $bill->skip);
+            Log::debug('Start is now ' . $start->format('Y-m-d'));
         }
 
-        return Carbon::now()->addDays(2); // in the future!
+        $end = Navigation::addPeriod($start, $bill->repeat_freq, $bill->skip);
+
+        Log::debug('nextDateMatch: Final start is ' . $start->format('Y-m-d'));
+        Log::debug('nextDateMatch: Matching end is ' . $end->format('Y-m-d'));
+
+        $cache->store($start);
+
+        return $start;
     }
 
     /**
-     * @param Bill $bill
+     * Given the date in $date, this method will return a moment in the future where the bill is expected to be paid.
      *
-     * @return \Carbon\Carbon
+     * @param Bill   $bill
+     * @param Carbon $date
+     *
+     * @return Carbon
      */
-    public function nextExpectedMatch(Bill $bill): Carbon
+    public function nextExpectedMatch(Bill $bill, Carbon $date): Carbon
     {
+        $cache = new CacheProperties;
+        $cache->addProperty($bill->id);
+        $cache->addProperty('nextExpectedMatch');
+        $cache->addProperty($date);
+        if ($cache->has()) {
+            return $cache->get(); // @codeCoverageIgnore
+        }
+        // find the most recent date for this bill NOT in the future. Cache this date:
+        $start = clone $bill->date;
+        Log::debug('nextExpectedMatch: Start is ' . $start->format('Y-m-d'));
 
-        $finalDate       = Carbon::now();
-        $finalDate->year = 1900;
-        if ($bill->active == 0) {
-            return $finalDate;
+        while ($start < $date) {
+            Log::debug(sprintf('$start (%s) < $date (%s)', $start->format('Y-m-d'), $date->format('Y-m-d')));
+            $start = Navigation::addPeriod($start, $bill->repeat_freq, $bill->skip);
+            Log::debug('Start is now ' . $start->format('Y-m-d'));
         }
 
-        /*
-         * $today is the start of the next period, to make sure FF3 won't miss anything
-         * when the current period has a transaction journal.
-         */
-        /** @var \Carbon\Carbon $obj */
-        $obj   = new Carbon;
-        $today = Navigation::addPeriod($obj, $bill->repeat_freq, 0);
+        $end = Navigation::addPeriod($start, $bill->repeat_freq, $bill->skip);
 
-        $skip  = $bill->skip + 1;
-        $start = Navigation::startOfPeriod($obj, $bill->repeat_freq);
-        /*
-         * go back exactly one month/week/etc because FF3 does not care about 'next'
-         * bills if they're too far into the past.
-         */
+        // see if the bill was paid in this period.
+        $journalCount = $bill->transactionJournals()->before($end)->after($start)->count();
 
-        $counter = 0;
-        while ($start <= $today) {
-            if (($counter % $skip) == 0) {
-                // do something.
-                $end          = Navigation::endOfPeriod(clone $start, $bill->repeat_freq);
-                $journalCount = $bill->transactionjournals()->before($end)->after($start)->count();
-                if ($journalCount == 0) {
-                    $finalDate = new Carbon($start->format('Y-m-d'));
-                    break;
-                }
-            }
-
-            // add period for next round!
-            $start = Navigation::addPeriod($start, $bill->repeat_freq, 0);
-            $counter++;
+        if ($journalCount > 0) {
+            // this period had in fact a bill. The new start is the current end, and we create a new end.
+            Log::debug(sprintf('Journal count is %d, so start becomes %s', $journalCount, $end->format('Y-m-d')));
+            $start = clone $end;
+            $end   = Navigation::addPeriod($start, $bill->repeat_freq, $bill->skip);
         }
+        Log::debug('nextExpectedMatch: Final start is ' . $start->format('Y-m-d'));
+        Log::debug('nextExpectedMatch: Matching end is ' . $end->format('Y-m-d'));
 
-        return $finalDate;
+        $cache->store($start);
+
+        return $start;
     }
 
     /**
@@ -505,15 +480,15 @@ class BillRepository implements BillRepositoryInterface
         if (false === $journal->isWithdrawal()) {
             return false;
         }
-        $destinationAccounts = TransactionJournal::destinationAccountList($journal);
-        $sourceAccounts      = TransactionJournal::sourceAccountList($journal);
+        $destinationAccounts = $journal->destinationAccountList();
+        $sourceAccounts      = $journal->sourceAccountList();
         $matches             = explode(',', $bill->match);
         $description         = strtolower($journal->description) . ' ';
-        $description .= strtolower(join(' ', $destinationAccounts->pluck('name')->toArray()));
-        $description .= strtolower(join(' ', $sourceAccounts->pluck('name')->toArray()));
+        $description         .= strtolower(join(' ', $destinationAccounts->pluck('name')->toArray()));
+        $description         .= strtolower(join(' ', $sourceAccounts->pluck('name')->toArray()));
 
         $wordMatch   = $this->doWordMatch($matches, $description);
-        $amountMatch = $this->doAmountMatch(TransactionJournal::amountPositive($journal), $bill->amount_min, $bill->amount_max);
+        $amountMatch = $this->doAmountMatch($journal->amountPositive(), $bill->amount_min, $bill->amount_max);
 
 
         /*
@@ -538,20 +513,27 @@ class BillRepository implements BillRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return Bill
      */
     public function store(array $data): Bill
     {
-
-
+        /** @var Bill $bill */
         $bill = Bill::create(
             [
                 'name'        => $data['name'],
                 'match'       => $data['match'],
                 'amount_min'  => $data['amount_min'],
-                'user_id'     => $data['user'],
+                'user_id'     => $this->user->id,
                 'amount_max'  => $data['amount_max'],
                 'date'        => $data['date'],
                 'repeat_freq' => $data['repeat_freq'],

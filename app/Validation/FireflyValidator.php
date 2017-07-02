@@ -3,15 +3,16 @@
  * FireflyValidator.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Validation;
 
-use Auth;
 use Config;
 use Crypt;
 use DB;
@@ -26,9 +27,8 @@ use FireflyIII\Rules\Triggers\TriggerInterface;
 use FireflyIII\User;
 use Google2FA;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Validation\Validator;
-use Session;
-use Symfony\Component\Translation\TranslatorInterface;
 
 /**
  * Class FireflyValidator
@@ -39,25 +39,25 @@ class FireflyValidator extends Validator
 {
 
     /**
-     * @param TranslatorInterface $translator
-     * @param array               $data
-     * @param array               $rules
-     * @param array               $messages
-     * @param array               $customAttributes
+     * @param Translator $translator
+     * @param array      $data
+     * @param array      $rules
+     * @param array      $messages
+     * @param array      $customAttributes
      *
      */
-    public function __construct(TranslatorInterface $translator, array $data, array $rules, array $messages = [], array $customAttributes = [])
+    public function __construct(Translator $translator, array $data, array $rules, array $messages = [], array $customAttributes = [])
     {
         parent::__construct($translator, $data, $rules, $messages, $customAttributes);
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
-     * @param $parameters
-     *
      *
      * @return bool
+     *
      */
     public function validate2faCode($attribute, $value): bool
     {
@@ -65,12 +65,13 @@ class FireflyValidator extends Validator
             return false;
         }
 
-        $secret = Session::get('two-factor-secret');
+        $secret = session('two-factor-secret');
 
         return Google2FA::verifyKey($secret, $value);
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
      * @param $parameters
@@ -84,7 +85,7 @@ class FireflyValidator extends Validator
         if (intval($value) === 0) {
             return true;
         }
-        $count = DB::table($parameters[0])->where('user_id', Auth::user()->id)->where($field, $value)->count();
+        $count = DB::table($parameters[0])->where('user_id', auth()->user()->id)->where($field, $value)->count();
         if ($count === 1) {
             return true;
         }
@@ -94,6 +95,29 @@ class FireflyValidator extends Validator
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @param $attribute
+     * @param $value
+     *
+     * @return bool
+     *
+     */
+    public function validateBic($attribute, $value): bool
+    {
+        $regex  = '/^[a-z]{6}[0-9a-z]{2}([0-9a-z]{3})?\z/i';
+        $result = preg_match($regex, $value);
+        if ($result === false) {
+            return false;
+        }
+        if ($result === 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
      *
@@ -120,6 +144,44 @@ class FireflyValidator extends Validator
         $checksum = bcmod($iban, '97');
 
         return (intval($checksum) === 1);
+    }
+
+    /**
+     * @param $attribute
+     * @param $value
+     * @param $parameters
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     *
+     * @return bool
+     */
+    public function validateMore($attribute, $value, $parameters): bool
+    {
+        $compare = $parameters[0] ?? '0';
+
+        return bccomp($value, $compare) > 0;
+    }
+
+    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @param $attribute
+     * @param $value
+     * @param $parameters
+     *
+     * @return bool
+     */
+    public function validateMustExist($attribute, $value, $parameters): bool
+    {
+        $field = $parameters[1] ?? 'id';
+
+        if (intval($value) === 0) {
+            return true;
+        }
+        $count = DB::table($parameters[0])->where($field, $value)->count();
+        if ($count === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -213,6 +275,7 @@ class FireflyValidator extends Validator
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
      * @param $parameters
@@ -223,7 +286,7 @@ class FireflyValidator extends Validator
     public function validateUniqueAccountForUser($attribute, $value, $parameters): bool
     {
         // because a user does not have to be logged in (tests and what-not).
-        if (!Auth::check()) {
+        if (!auth()->check()) {
             return $this->validateAccountAnonymously();
         }
 
@@ -243,6 +306,7 @@ class FireflyValidator extends Validator
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
      * @param $parameters
@@ -253,9 +317,8 @@ class FireflyValidator extends Validator
     {
         $accountId = $this->data['id'] ?? 0;
 
-        $query = AccountMeta::
-        leftJoin('accounts', 'accounts.id', '=', 'account_meta.account_id')
-                            ->where('accounts.user_id', Auth::user()->id)
+        $query = AccountMeta::leftJoin('accounts', 'accounts.id', '=', 'account_meta.account_id')
+                            ->where('accounts.user_id', auth()->user()->id)
                             ->where('account_meta.name', 'accountNumber');
 
         if (intval($accountId) > 0) {
@@ -277,30 +340,7 @@ class FireflyValidator extends Validator
     }
 
     /**
-     * @param $attribute
-     * @param $value
-     * @param $parameters
-     *
-     *
-     * @return bool
-     */
-    public function validateUniqueForUser($attribute, $value, $parameters): bool
-    {
-        $query = DB::table($parameters[0])->where($parameters[1], $value);
-        $query->where('user_id', Auth::user()->id);
-        if (isset($parameters[2])) {
-            $query->where('id', '!=', $parameters[2]);
-        }
-        $count = $query->count();
-        if ($count == 0) {
-            return true;
-        }
-
-        return false;
-
-    }
-
-    /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * Validate an object and its unicity. Checks for encryption / encrypted values as well.
      *
      * parameter 0: the table
@@ -323,7 +363,7 @@ class FireflyValidator extends Validator
         $exclude = $parameters[2] ?? 0;
 
         // get entries from table
-        $set = DB::table($table)->where('user_id', Auth::user()->id)
+        $set = DB::table($table)->where('user_id', auth()->user()->id)
                  ->where('id', '!=', $exclude)->get([$field]);
 
         foreach ($set as $entry) {
@@ -338,6 +378,7 @@ class FireflyValidator extends Validator
     }
 
     /**
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
      * @param $parameters
@@ -348,7 +389,7 @@ class FireflyValidator extends Validator
     {
         $exclude = $parameters[0] ?? null;
         $query   = DB::table('piggy_banks')->whereNull('piggy_banks.deleted_at')
-                     ->leftJoin('accounts', 'accounts.id', '=', 'piggy_banks.account_id')->where('accounts.user_id', Auth::user()->id);
+                     ->leftJoin('accounts', 'accounts.id', '=', 'piggy_banks.account_id')->where('accounts.user_id', auth()->user()->id);
         if (!is_null($exclude)) {
             $query->where('piggy_banks.id', '!=', $exclude);
         }
@@ -431,7 +472,6 @@ class FireflyValidator extends Validator
      * @param $value
      *
      * @return bool
-     * @internal param $parameters
      *
      */
     private function validateByAccountId($value): bool
@@ -443,7 +483,7 @@ class FireflyValidator extends Validator
         $ignore = $existingAccount->id;
         $value  = $this->tryDecrypt($value);
 
-        $set = Auth::user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
+        $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
             if ($entry->name == $value) {
@@ -467,7 +507,7 @@ class FireflyValidator extends Validator
         $ignore = $parameters[0] ?? 0;
         $value  = $this->tryDecrypt($value);
 
-        $set = Auth::user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
+        $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
             if ($entry->name == $value) {
@@ -491,7 +531,7 @@ class FireflyValidator extends Validator
         $type   = AccountType::whereType($search)->first();
         $ignore = $parameters[0] ?? 0;
 
-        $set = Auth::user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
+        $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
             if ($entry->name == $value) {

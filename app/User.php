@@ -3,63 +3,34 @@
  * User.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 
 namespace FireflyIII;
 
+use FireflyIII\Events\RequestedNewPassword;
+use FireflyIII\Models\CurrencyExchangeRate;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Request;
 
 /**
  * Class User
  *
  * @package FireflyIII
- * @property integer                                                                               $id
- * @property \Carbon\Carbon                                                                        $created_at
- * @property \Carbon\Carbon                                                                        $updated_at
- * @property string                                                                                $email
- * @property string                                                                                $password
- * @property string                                                                                $remember_token
- * @property string                                                                                $reset
- * @property bool                                                                                  $activated
- * @property bool                                                                                  $isAdmin
- * @property bool                                                                                  $has2FA
- * @property boolean                                                                               $blocked
- * @property string                                                                                $blocked_code
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Account[]            $accounts
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Attachment[]         $attachments
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Tag[]                $tags
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Bill[]               $bills
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Budget[]             $budgets
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Category[]           $categories
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Preference[]         $preferences
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\TransactionJournal[] $transactionjournals
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Role[]               $roles
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\RuleGroup[]          $ruleGroups
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Rule[]               $rules
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\ExportJob[]          $exportjobs
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereEmail($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User wherePassword($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereRememberToken($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereReset($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereBlocked($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\User whereBlockedCode($value)
- * @mixin \Eloquent
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\ImportJob[] $importjobs
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\PiggyBank[] $piggyBanks
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Transaction[] $transactions
  */
 class User extends Authenticatable
 {
+    use Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -67,6 +38,7 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = ['email', 'password', 'blocked', 'blocked_code'];
+
     /**
      * The attributes excluded from the model's JSON form.
      *
@@ -119,6 +91,14 @@ class User extends Authenticatable
     /**
      * @return HasMany
      */
+    public function availableBudgets(): HasMany
+    {
+        return $this->hasMany('FireflyIII\Models\AvailableBudget');
+    }
+
+    /**
+     * @return HasMany
+     */
     public function bills(): HasMany
     {
         return $this->hasMany('FireflyIII\Models\Bill');
@@ -143,17 +123,17 @@ class User extends Authenticatable
     /**
      * @return HasMany
      */
-    public function exportjobs(): HasMany
+    public function currencyExchangeRates(): HasMany
     {
-        return $this->hasMany('FireflyIII\Models\ExportJob');
+        return $this->hasMany(CurrencyExchangeRate::class);
     }
 
     /**
      * @return HasMany
      */
-    public function importjobs(): HasMany
+    public function exportJobs(): HasMany
     {
-        return $this->hasMany('FireflyIII\Models\ImportJob');
+        return $this->hasMany('FireflyIII\Models\ExportJob');
     }
 
     /**
@@ -175,6 +155,14 @@ class User extends Authenticatable
         }
 
         return false;
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function importJobs(): HasMany
+    {
+        return $this->hasMany('FireflyIII\Models\ImportJob');
     }
 
     /**
@@ -218,6 +206,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Send the password reset notification.
+     *
+     * @param  string $token
+     *
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $ipAddress = Request::ip();
+
+        event(new RequestedNewPassword($this, $token, $ipAddress));
+    }
+
+    /**
      * @return HasMany
      */
     public function tags(): HasMany
@@ -228,7 +230,7 @@ class User extends Authenticatable
     /**
      * @return HasMany
      */
-    public function transactionjournals(): HasMany
+    public function transactionJournals(): HasMany
     {
         return $this->hasMany('FireflyIII\Models\TransactionJournal');
     }
@@ -240,5 +242,6 @@ class User extends Authenticatable
     {
         return $this->hasManyThrough('FireflyIII\Models\Transaction', 'FireflyIII\Models\TransactionJournal');
     }
+
 
 }

@@ -3,15 +3,16 @@
  * Date.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support\Binder;
 
-use Auth;
 use Carbon\Carbon;
 use Exception;
 use FireflyIII\Helpers\FiscalHelper;
@@ -42,7 +43,7 @@ class Date implements BinderInterface
                 try {
                     $date = new Carbon($value);
                 } catch (Exception $e) {
-                    Log::error('Could not parse date "' . $value . '" for user #' . Auth::user()->id);
+                    Log::error('Could not parse date "' . $value . '" for user #' . auth()->user()->id);
                     throw new NotFoundHttpException;
                 }
 

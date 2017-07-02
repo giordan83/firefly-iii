@@ -3,11 +3,13 @@
  * ExpandedForm.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support;
 
@@ -38,20 +40,9 @@ class ExpandedForm
      */
     public function amount(string $name, $value = null, array $options = []): string
     {
-        $label           = $this->label($name, $options);
-        $options         = $this->expandOptionArray($name, $label, $options);
-        $classes         = $this->getHolderClasses($name);
-        $value           = $this->fillFieldValue($name, $value);
-        $options['step'] = 'any';
-        $options['min']  = '0.01';
-        $defaultCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
-        $currencies      = Amt::getAllCurrencies();
-        unset($options['currency']);
-        unset($options['placeholder']);
-        $html = view('form.amount', compact('defaultCurrency', 'currencies', 'classes', 'name', 'label', 'value', 'options'))->render();
+        $options['min'] = '0.01';
 
-        return $html;
-
+        return $this->currencyField($name, 'amount', $value, $options);
     }
 
     /**
@@ -63,20 +54,9 @@ class ExpandedForm
      */
     public function amountSmall(string $name, $value = null, array $options = []): string
     {
-        $label           = $this->label($name, $options);
-        $options         = $this->expandOptionArray($name, $label, $options);
-        $classes         = $this->getHolderClasses($name);
-        $value           = $this->fillFieldValue($name, $value);
-        $options['step'] = 'any';
-        $options['min']  = '0.01';
-        $defaultCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
-        $currencies      = Amt::getAllCurrencies();
-        unset($options['currency']);
-        unset($options['placeholder']);
-        $html = view('form.amount-small', compact('defaultCurrency', 'currencies', 'classes', 'name', 'value', 'options'))->render();
+        $options['min'] = '0.01';
 
-        return $html;
-
+        return $this->currencyField($name, 'amount-small', $value, $options);
     }
 
     /**
@@ -88,18 +68,7 @@ class ExpandedForm
      */
     public function balance(string $name, $value = null, array $options = []): string
     {
-        $label           = $this->label($name, $options);
-        $options         = $this->expandOptionArray($name, $label, $options);
-        $classes         = $this->getHolderClasses($name);
-        $value           = $this->fillFieldValue($name, $value);
-        $options['step'] = 'any';
-        $defaultCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
-        $currencies      = Amt::getAllCurrencies();
-        unset($options['currency']);
-        unset($options['placeholder']);
-        $html = view('form.balance', compact('defaultCurrency', 'currencies', 'classes', 'name', 'label', 'value', 'options'))->render();
-
-        return $html;
+        return $this->currencyField($name, 'balance', $value, $options);
     }
 
     /**
@@ -297,6 +266,67 @@ class ExpandedForm
     }
 
     /**
+     * @param string $name
+     * @param null   $value
+     * @param array  $options
+     *
+     * @return string
+     */
+    public function nonSelectableAmount(string $name, $value = null, array $options = []): string
+    {
+        $label            = $this->label($name, $options);
+        $options          = $this->expandOptionArray($name, $label, $options);
+        $classes          = $this->getHolderClasses($name);
+        $value            = $this->fillFieldValue($name, $value);
+        $options['step']  = 'any';
+        $options['min']   = '0.01';
+        $selectedCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
+        unset($options['currency']);
+        unset($options['placeholder']);
+
+        // make sure value is formatted nicely:
+        if (!is_null($value) && $value !== '') {
+            $value = round($value, $selectedCurrency->decimal_places);
+        }
+
+
+        $html = view('form.non-selectable-amount', compact('selectedCurrency', 'classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
+    }
+
+
+    /**
+     * @param string $name
+     * @param null   $value
+     * @param array  $options
+     *
+     * @return string
+     */
+    public function nonSelectableBalance(string $name, $value = null, array $options = []): string
+    {
+        $label            = $this->label($name, $options);
+        $options          = $this->expandOptionArray($name, $label, $options);
+        $classes          = $this->getHolderClasses($name);
+        $value            = $this->fillFieldValue($name, $value);
+        $options['step']  = 'any';
+        $selectedCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
+        unset($options['currency']);
+        unset($options['placeholder']);
+
+        // make sure value is formatted nicely:
+        if (!is_null($value) && $value !== '') {
+            $decimals = $selectedCurrency->decimal_places ?? 2;
+            $value    = round($value, $decimals);
+        }
+
+
+        $html = view('form.non-selectable-amount', compact('selectedCurrency', 'classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
+    }
+
+    /**
      * @param $type
      * @param $name
      *
@@ -318,6 +348,22 @@ class ExpandedForm
         return $html;
     }
 
+    /**
+     * @param       $name
+     * @param array $options
+     *
+     * @return string
+     */
+    public function password(string $name, array $options = []): string
+    {
+        $label   = $this->label($name, $options);
+        $options = $this->expandOptionArray($name, $label, $options);
+        $classes = $this->getHolderClasses($name);
+        $html    = view('form.password', compact('classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
+
+    }
 
     /**
      * @param       $name
@@ -425,6 +471,7 @@ class ExpandedForm
      */
     protected function expandOptionArray(string $name, $label, array $options): array
     {
+        $name                    = str_replace('[]', '', $name);
         $options['class']        = 'form-control';
         $options['id']           = 'ffInput_' . $name;
         $options['autocomplete'] = 'off';
@@ -492,8 +539,40 @@ class ExpandedForm
         if (isset($options['label'])) {
             return $options['label'];
         }
+        $name = str_replace('[]', '', $name);
 
         return strval(trans('form.' . $name));
 
+    }
+
+    /**
+     * @param string $name
+     * @param string $view
+     * @param null   $value
+     * @param array  $options
+     *
+     * @return string
+     */
+    private function currencyField(string $name, string $view, $value = null, array $options = []): string
+    {
+        $label           = $this->label($name, $options);
+        $options         = $this->expandOptionArray($name, $label, $options);
+        $classes         = $this->getHolderClasses($name);
+        $value           = $this->fillFieldValue($name, $value);
+        $options['step'] = 'any';
+        $defaultCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
+        $currencies      = Amt::getAllCurrencies();
+        unset($options['currency']);
+        unset($options['placeholder']);
+
+        // make sure value is formatted nicely:
+        if (!is_null($value) && $value !== '') {
+            $value = round($value, $defaultCurrency->decimal_places);
+        }
+
+
+        $html = view('form.' . $view, compact('defaultCurrency', 'currencies', 'classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
     }
 }

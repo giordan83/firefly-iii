@@ -27,49 +27,52 @@
     Make sum:
     {% set sum = 0 %}
     -->
-    {% for journal in journals %}
+    {% for transaction in journals %}
         <!-- add to sum
-        {% set sum = (sum + getAmount(journal) ) %}
+        {% set sum = (sum + transaction.transaction_amount) %}
         -->
-        <tr class="drag" data-date="{{ journal.date.format('Y-m-d') }}" data-id="{{ journal.id }}">
+        <tr class="drag" data-date="{{ transaction.date.format('Y-m-d') }}" data-id="{{ transaction.journal_id }}">
             <td class="hidden-xs">
-                {{ journal|typeIcon }}
+                {{ transaction|typeIconTransaction }}
             </td>
             <td>
-                <a href="{{ route('transactions.show',journal.id) }}" title="{{ journal.description }}">{{ journal.description }}</a>
+                <a href="{{ route('transactions.show',transaction.journal_id) }}">
+                    {% if transaction.transaction_description|length > 0 %}
+                        {{ transaction.transaction_description }} ({{ transaction.description }})
+                    {% else %}
+                        {{ transaction.description }}
+                    {% endif %}
+                </a>
             </td>
             <td>
-                {% if not accountPerspective %}
-                    {{ journal|formatJournal }}
-                {% else %}
-                    {{ formatAccountPerspective(journal, accountPerspective)|raw }}
-                {% endif %}
+                {# TODO replace with new format code #}
+                {{ transactionAmount(transaction) }}
             </td>
             <td class="hidden-sm hidden-xs">
-                {{ journal.date.formatLocalized(monthAndDayFormat) }}
+                {{ transaction.date.formatLocalized(monthAndDayFormat) }}
             </td>
             {% if not hideSource %}
                 <td class="hidden-xs">
-                    {{ sourceAccount(journal)|raw }}
+                    {{ transactionSourceAccount(transaction) }}
                 </td>
             {% endif %}
             {% if not hideDestination %}
                 <td class="hidden-xs">
-                    {{ destinationAccount(journal)|raw }}
+                    {{ transactionDestinationAccount(transaction) }}
                 </td>
             {% endif %}
 
             <!-- Do NOT hide the budget? -->
             {% if not hideBudget %}
                 <td class="hidden-xs">
-                    {{ journalBudgets(journal)|raw }}
+                    {{ transactionBudgets(transaction) }}
                 </td>
             {% endif %}
 
             <!-- Do NOT hide the category? -->
             {% if not hideCategory %}
                 <td class="hidden-xs">
-                    {{ journalCategories(journal)|raw }}
+                    {{ transactionCategories(transaction) }}
                 </td>
             {% endif %}
         </tr>

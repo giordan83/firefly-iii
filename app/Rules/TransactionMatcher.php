@@ -3,18 +3,22 @@
  * TransactionMatcher.php
  * Copyright (C) 2016 Robert Horlings
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Rules;
 
-use FireflyIII\Models\TransactionJournal;
+use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionType;
-use FireflyIII\Repositories\Journal\JournalRepositoryInterface;
+use FireflyIII\Repositories\Journal\JournalTaskerInterface;
 use Illuminate\Support\Collection;
+use Log;
 
 /**
  * Class TransactionMatcher is used to find a list of
@@ -28,8 +32,8 @@ class TransactionMatcher
     private $limit = 10;
     /** @var int Maximum number of transaction to search in (for performance reasons) * */
     private $range = 200;
-    /** @var  JournalRepositoryInterface */
-    private $repository;
+    /** @var  JournalTaskerInterface */
+    private $tasker;
     /** @var array */
     private $transactionTypes = [TransactionType::DEPOSIT, TransactionType::WITHDRAWAL, TransactionType::TRANSFER];
     /** @var array List of triggers to match */
@@ -38,11 +42,11 @@ class TransactionMatcher
     /**
      * TransactionMatcher constructor. Typehint the repository.
      *
-     * @param JournalRepositoryInterface $repository
+     * @param JournalTaskerInterface $tasker
      */
-    public function __construct(JournalRepositoryInterface $repository)
+    public function __construct(JournalTaskerInterface $tasker)
     {
-        $this->repository = $repository;
+        $this->tasker = $tasker;
 
     }
 
@@ -59,7 +63,7 @@ class TransactionMatcher
         if (count($this->triggers) === 0) {
             return new Collection;
         }
-        $pagesize = min($this->range / 2, $this->limit * 2);
+        $pageSize = min($this->range / 2, $this->limit * 2);
 
         // Variables used within the loop
         $processed = 0;
@@ -73,28 +77,44 @@ class TransactionMatcher
         //   - the maximum number of transactions to search in have been searched 
         do {
             // Fetch a batch of transactions from the database
-            $paginator = $this->repository->getJournals($this->transactionTypes, $page, $pagesize);
-            $set       = $paginator->getCollection();
-
+            /** @var JournalCollectorInterface $collector */
+            $collector = app(JournalCollectorInterface::class);
+            $collector->setUser(auth()->user());
+            $collector->setAllAssetAccounts()->setLimit($pageSize)->setPage($page)->setTypes($this->transactionTypes);
+            $set = $collector->getPaginatedJournals();
+            Log::debug(sprintf('Found %d journals to check. ', $set->count()));
 
             // Filter transactions that match the given triggers.
             $filtered = $set->filter(
-                function (TransactionJournal $journal) use ($processor) {
-                    return $processor->handleTransactionJournal($journal);
+                function (Transaction $transaction) use ($processor) {
+                    Log::debug(sprintf('Test these triggers on journal #%d (transaction #%d)', $transaction->transaction_journal_id, $transaction->id));
+
+                    return $processor->handleTransaction($transaction);
                 }
             );
 
+            Log::debug(sprintf('Found %d journals that match.', $filtered->count()));
+
             // merge:
+            /** @var Collection $result */
             $result = $result->merge($filtered);
+            Log::debug(sprintf('Total count is now %d', $result->count()));
 
             // Update counters
             $page++;
             $processed += count($set);
 
+            Log::debug(sprintf('Page is now %d, processed is %d', $page, $processed));
+
             // Check for conditions to finish the loop
-            $reachedEndOfList = $set->count() < $pagesize;
+            $reachedEndOfList = $set->count() < 1;
             $foundEnough      = $result->count() >= $this->limit;
             $searchedEnough   = ($processed >= $this->range);
+
+            Log::debug(sprintf('reachedEndOfList: %s', var_export($reachedEndOfList, true)));
+            Log::debug(sprintf('foundEnough: %s', var_export($foundEnough, true)));
+            Log::debug(sprintf('searchedEnough: %s', var_export($searchedEnough, true)));
+
         } while (!$reachedEndOfList && !$foundEnough && !$searchedEnough);
 
         // If the list of matchingTransactions is larger than the maximum number of results

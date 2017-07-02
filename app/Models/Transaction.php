@@ -3,11 +3,13 @@
  * Transaction.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -18,50 +20,39 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Watson\Validating\ValidatingTrait;
 
 /**
- * FireflyIII\Models\Transaction
+ * Class Transaction
  *
- * @property integer                                                                     $id
- * @property \Carbon\Carbon                                                              $created_at
- * @property \Carbon\Carbon                                                              $updated_at
- * @property \Carbon\Carbon                                                              $deleted_at
- * @property integer                                                                     $account_id
- * @property integer                                                                     $transaction_journal_id
- * @property string                                                                      $description
- * @property float                                                                       $amount
- * @property-read Account                                                                $account
- * @property-read TransactionJournal                                                     $transactionJournal
- * @method static \Illuminate\Database\Query\Builder|Transaction after($date)
- * @method static \Illuminate\Database\Query\Builder|Transaction before($date)
- * @property float                                                                       $before
- * @property float                                                                       $after
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereDeletedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereAccountId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereTransactionJournalId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereDescription($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction whereAmount($value)
- * @mixin \Eloquent
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Budget[]   $budgets
- * @property-read \Illuminate\Database\Eloquent\Collection|\FireflyIII\Models\Category[] $categories
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\Transaction transactionTypes($types)
+ * @package FireflyIII\Models
  */
 class Transaction extends Model
 {
-
-    protected $dates    = ['created_at', 'updated_at', 'deleted_at'];
-    protected $fillable = ['account_id', 'transaction_journal_id', 'description', 'amount'];
-    protected $hidden   = ['encrypted'];
-    protected $rules
-                        = [
-            'account_id'             => 'required|exists:accounts,id',
-            'transaction_journal_id' => 'required|exists:transaction_journals,id',
-            'description'            => 'between:1,255',
-            'amount'                 => 'required|numeric',
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+                      = [
+            'created_at'          => 'date',
+            'updated_at'          => 'date',
+            'deleted_at'          => 'date',
+            'identifier'          => 'int',
+            'encrypted'           => 'boolean', // model does not have these fields though
+            'bill_name_encrypted' => 'boolean',
         ];
-
-    use SoftDeletes, ValidatingTrait;
+    protected $dates  = ['created_at', 'updated_at', 'deleted_at'];
+    protected $fillable
+                      = ['account_id', 'transaction_journal_id', 'description', 'amount', 'identifier', 'transaction_currency_id', 'foreign_currency_id',
+                         'foreign_amount'];
+    protected $hidden = ['encrypted'];
+    protected $rules
+                      = [
+            'account_id'              => 'required|exists:accounts,id',
+            'transaction_journal_id'  => 'required|exists:transaction_journals,id',
+            'transaction_currency_id' => 'required|exists:transaction_currencies,id',
+            'description'             => 'between:0,1024',
+            'amount'                  => 'required|numeric',
+        ];
 
     /**
      * @param Builder $query
@@ -69,7 +60,7 @@ class Transaction extends Model
      *
      * @return bool
      */
-    public static function isJoined(Builder $query, string $table):bool
+    public static function isJoined(Builder $query, string $table): bool
     {
         $joins = $query->getQuery()->joins;
         if (is_null($joins)) {
@@ -83,6 +74,8 @@ class Transaction extends Model
 
         return false;
     }
+
+    use SoftDeletes, ValidatingTrait;
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -106,6 +99,14 @@ class Transaction extends Model
     public function categories()
     {
         return $this->belongsToMany('FireflyIII\Models\Category');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function foreignCurrency()
+    {
+        return $this->belongsTo('FireflyIII\Models\TransactionCurrency', 'foreign_currency_id');
     }
 
     /**
@@ -167,7 +168,15 @@ class Transaction extends Model
      */
     public function setAmountAttribute($value)
     {
-        $this->attributes['amount'] = strval(round($value, 2));
+        $this->attributes['amount'] = strval(round($value, 12));
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function transactionCurrency()
+    {
+        return $this->belongsTo('FireflyIII\Models\TransactionCurrency');
     }
 
     /**

@@ -1,78 +1,87 @@
 <?php
-declare(strict_types = 1);
 
+namespace Tests;
 
 use Carbon\Carbon;
 use FireflyIII\Models\Preference;
 use FireflyIII\User;
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Log;
+use Mockery;
 
 /**
  * Class TestCase
+ *
+ * @package Tests
  */
-class TestCase extends Illuminate\Foundation\Testing\TestCase
+abstract class TestCase extends BaseTestCase
 {
-    /**
-     * The base URL to use while testing the application.
-     *
-     * @var string
-     */
-    protected $baseUrl = 'http://localhost';
-
+    use CreatesApplication;
 
     /**
-     * Creates the application.
-     *
-     * @return \Illuminate\Foundation\Application
+     * @param User   $user
+     * @param string $range
      */
-    public function createApplication()
+    public function changeDateRange(User $user, $range)
     {
-        $app = require __DIR__ . '/../bootstrap/app.php';
+        $valid = ['1D', '1W', '1M', '3M', '6M', '1Y', 'custom'];
+        if (in_array($range, $valid)) {
+            Preference::where('user_id', $user->id)->where('name', 'viewRange')->delete();
+            Preference::create(
+                [
+                    'user_id' => $user->id,
+                    'name'    => 'viewRange',
+                    'data'    => $range,
+                ]
+            );
+            // set period to match?
 
-        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
-        return $app;
-    }
-
-    /**
-     * Sets up the fixture, for example, opens a network connection.
-     * This method is called before a test is executed.
-     */
-    public function setUp()
-    {
-        parent::setUp();
-
-        // if the database copy does not exist, call migrate.
-        $copy     = storage_path('database') . '/testing-copy.db';
-        $original = storage_path('database') . '/testing.db';
-
-        // move .env file over?
-        if (!file_exists($copy)) {
-
-            // maybe original does?
-            if (!file_exists($original)) {
-                touch($original);
-                Artisan::call('migrate', ['--seed' => true]);
-            }
-
-            copy($original, $copy);
-        } else {
-            if (file_exists($copy)) {
-                copy($copy, $original);
-            }
         }
-        // if the database copy does exists, copy back as original.
-
+        if ($range === 'custom') {
+            $this->session(
+                [
+                    'start' => Carbon::now()->subDays(20),
+                    'end'   => Carbon::now(),
+                ]
+            );
+        }
     }
 
     /**
-     * Tears down the fixture, for example, closes a network connection.
-     * This method is called after a test is executed.
+     * @return array
      */
-    public function tearDown()
+    public function dateRangeProvider()
     {
-        parent::tearDown();
+        return [
+            'one day'      => ['1D'],
+            'one week'     => ['1W'],
+            'one month'    => ['1M'],
+            'three months' => ['3M'],
+            'six months'   => ['6M'],
+            'one year'     => ['1Y'],
+            'custom range' => ['custom'],
+        ];
     }
 
+    /**
+     * @return User
+     */
+    public function emptyUser()
+    {
+        $user = User::find(2);
+
+        return $user;
+    }
+
+    /**
+     * @return User
+     */
+    public function user()
+    {
+        $user = User::find(1);
+
+        return $user;
+    }
 
     /**
      * @param string $class
@@ -81,13 +90,11 @@ class TestCase extends Illuminate\Foundation\Testing\TestCase
      */
     protected function mock($class)
     {
+        Log::debug(sprintf('Will now mock %s', $class));
         $object = Mockery::mock($class);
-
-
         $this->app->instance($class, $object);
 
         return $object;
     }
-
 
 }

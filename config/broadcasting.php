@@ -1,7 +1,13 @@
 <?php
-declare(strict_types = 1);
-
-
+/**
+ * broadcasting.php
+ * Copyright (C) 2016 thegrumpydictator@gmail.com
+ *
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
+ */
 
 return [
 
@@ -14,9 +20,11 @@ return [
     | framework when an event needs to be broadcast. You may set this to
     | any of the connections defined in the "connections" array below.
     |
+    | Supported: "pusher", "redis", "log", "null"
+    |
     */
 
-    'default' => env('BROADCAST_DRIVER', 'pusher'),
+    'default' => env('BROADCAST_DRIVER', 'null'),
 
     /*
     |--------------------------------------------------------------------------
@@ -32,22 +40,26 @@ return [
     'connections' => [
 
         'pusher' => [
-            'driver' => 'pusher',
-            'key' => env('PUSHER_KEY'),
-            'secret' => env('PUSHER_SECRET'),
-            'app_id' => env('PUSHER_APP_ID'),
+            'driver'  => 'pusher',
+            'key'     => env('PUSHER_KEY'),
+            'secret'  => env('PUSHER_SECRET'),
+            'app_id'  => env('PUSHER_APP_ID'),
             'options' => [
                 //
             ],
         ],
 
         'redis' => [
-            'driver' => 'redis',
+            'driver'     => 'redis',
             'connection' => 'default',
         ],
 
         'log' => [
             'driver' => 'log',
+        ],
+
+        'null' => [
+            'driver' => 'null',
         ],
 
     ],

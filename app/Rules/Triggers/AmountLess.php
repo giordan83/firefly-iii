@@ -3,16 +3,19 @@
  * AmountLess.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Rules\Triggers;
 
 
 use FireflyIII\Models\TransactionJournal;
+use Log;
 
 /**
  * Class AmountLess
@@ -43,6 +46,7 @@ final class AmountLess extends AbstractTrigger implements TriggerInterface
         if (!is_null($value)) {
             return false;
         }
+        Log::error(sprintf('Cannot use %s with a null value.', self::class));
 
         return true;
     }
@@ -54,12 +58,16 @@ final class AmountLess extends AbstractTrigger implements TriggerInterface
      */
     public function triggered(TransactionJournal $journal): bool
     {
-        $amount  = $journal->destination_amount ?? TransactionJournal::amountPositive($journal);
+        $amount  = $journal->destination_amount ?? $journal->amountPositive();
         $compare = $this->triggerValue;
-        $result  = bccomp($amount, $compare, 4);
+        $result  = bccomp($amount, $compare);
         if ($result === -1) {
+            Log::debug(sprintf('RuleTrigger AmountLess for journal #%d: %d is less than %d, so return true', $journal->id, $amount, $compare));
+
             return true;
         }
+
+        Log::debug(sprintf('RuleTrigger AmountLess for journal #%d: %d is NOT less than %d, so return false', $journal->id, $amount, $compare));
 
         return false;
 

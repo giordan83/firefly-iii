@@ -3,43 +3,41 @@
  * RuleTrigger.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * FireflyIII\Models\RuleTrigger
+ * Class RuleTrigger
  *
- * @property integer                      $id
- * @property \Carbon\Carbon               $created_at
- * @property \Carbon\Carbon               $updated_at
- * @property integer                      $rule_id
- * @property integer                      $order
- * @property string                       $title
- * @property string                       $trigger_type
- * @property string                       $trigger_value
- * @property boolean                      $active
- * @property boolean                      $stop_processing
- * @property-read \FireflyIII\Models\Rule $rule
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereCreatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereUpdatedAt($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereRuleId($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereOrder($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereActive($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereStopProcessing($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereTriggerType($value)
- * @method static \Illuminate\Database\Query\Builder|\FireflyIII\Models\RuleTrigger whereTriggerValue($value)
- * @mixin \Eloquent
+ * @package FireflyIII\Models
  */
 class RuleTrigger extends Model
 {
+    /**
+     * The attributes that should be casted to native types.
+     *
+     * @var array
+     */
+    protected $casts
+        = [
+            'created_at'      => 'date',
+            'updated_at'      => 'date',
+            'active'          => 'boolean',
+            'order'           => 'int',
+            'stop_processing' => 'boolean',
+        ];
+    /** @var array */
+    protected $dates = ['created_at', 'updated_at'];
+
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */

@@ -1,19 +1,20 @@
 <?php
 /**
- * Handler.php
+ * CommandHandler.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Import\Logging;
 
 use Illuminate\Console\Command;
 use Monolog\Handler\AbstractProcessingHandler;
-use Monolog\Logger;
 
 /**
  * Class CommandHandler
@@ -55,31 +56,9 @@ class CommandHandler extends AbstractProcessingHandler
      */
     private function changeLevel(string $level)
     {
-        switch ($level) {
-            case 'debug':
-                $this->setLevel(Logger::DEBUG);
-                break;
-            case 'info':
-                $this->setLevel(Logger::INFO);
-                break;
-            case 'notice':
-                $this->setLevel(Logger::NOTICE);
-                break;
-            case 'warning':
-                $this->setLevel(Logger::WARNING);
-                break;
-            case 'error':
-                $this->setLevel(Logger::ERROR);
-                break;
-            case 'critical':
-                $this->setLevel(Logger::CRITICAL);
-                break;
-            case 'alert':
-                $this->setLevel(Logger::ALERT);
-                break;
-            case 'emergency':
-                $this->setLevel(Logger::EMERGENCY);
-                break;
+        $level = strtoupper($level);
+        if (defined(sprintf('Logger::%s', $level))) {
+            $this->setLevel(constant(sprintf('Logger::%s', $level)));
         }
     }
 }

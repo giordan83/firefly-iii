@@ -1,14 +1,15 @@
 <?php
-declare(strict_types = 1);
 /**
  * ActionFactory.php
  * Copyright (C) 2016 Robert Horlings
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Rules\Factory;
 
@@ -16,6 +17,7 @@ use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Models\RuleAction;
 use FireflyIII\Rules\Actions\ActionInterface;
 use FireflyIII\Support\Domain;
+use Log;
 
 /**
  * Interface ActionInterface
@@ -39,6 +41,7 @@ class ActionFactory
     public static function getAction(RuleAction $action): ActionInterface
     {
         $class = self::getActionClass($action->action_type);
+        Log::debug(sprintf('self::getActionClass("%s") = "%s"', $action->action_type, $class));
 
         return new $class($action);
     }

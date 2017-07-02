@@ -3,11 +3,13 @@
  * EncryptFile.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Console\Commands;
 
@@ -33,7 +35,7 @@ class EncryptFile extends Command
      *
      * @var string
      */
-    protected $signature = 'firefly:encrypt {file} {key}';
+    protected $signature = 'firefly:encrypt-file {file} {key}';
 
     /**
      * Create a new command instance.
@@ -46,8 +48,6 @@ class EncryptFile extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return mixed
      */
     public function handle()
     {
@@ -64,6 +64,5 @@ class EncryptFile extends Command
         $path = storage_path('upload') . '/' . $newName;
         file_put_contents($path, $content);
         $this->line(sprintf('Encrypted "%s" and put it in "%s"', $file, $path));
-
     }
 }

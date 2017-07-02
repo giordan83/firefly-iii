@@ -3,20 +3,25 @@
  * Handler.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms
- * of the MIT license.  See the LICENSE file for details.
+ * This software may be modified and distributed under the terms of the
+ * Creative Commons Attribution-ShareAlike 4.0 International License.
+ *
+ * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Exceptions;
 
-use Auth;
 use ErrorException;
 use Exception;
 use FireflyIII\Jobs\MailError;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Validation\ValidationException as ValException;
 use Request;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -34,9 +39,12 @@ class Handler extends ExceptionHandler
      */
     protected $dontReport
         = [
+            AuthenticationException::class,
             AuthorizationException::class,
             HttpException::class,
             ModelNotFoundException::class,
+            TokenMismatchException::class,
+            ValException::class,
         ];
 
     /**
@@ -66,20 +74,21 @@ class Handler extends ExceptionHandler
      * This is a great spot to send exceptions to Sentry, Bugsnag, etc.
      *
      * @param  Exception $exception
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity) // it's exactly five.
      *
      * @return void
      */
     public function report(Exception $exception)
     {
-
-        if ($exception instanceof FireflyException || $exception instanceof ErrorException) {
+        $doMailError = env('SEND_ERROR_MESSAGE', true);
+        if (($exception instanceof FireflyException || $exception instanceof ErrorException) && $doMailError) {
             $userData = [
                 'id'    => 0,
                 'email' => 'unknown@example.com',
             ];
-            if (Auth::check()) {
-                $userData['id']    = Auth::user()->id;
-                $userData['email'] = Auth::user()->email;
+            if (auth()->check()) {
+                $userData['id']    = auth()->user()->id;
+                $userData['email'] = auth()->user()->email;
             }
             $data = [
                 'class'        => get_class($exception),
@@ -89,13 +98,31 @@ class Handler extends ExceptionHandler
                 'file'         => $exception->getFile(),
                 'line'         => $exception->getLine(),
                 'code'         => $exception->getCode(),
+                'version'      => config('firefly.version'),
             ];
 
             // create job that will mail.
-            $job = new MailError($userData, env('SITE_OWNER'), Request::ip(), $data);
+            $ipAddress = Request::ip() ?? '0.0.0.0';
+            $job       = new MailError($userData, env('SITE_OWNER', ''), $ipAddress, $data);
             dispatch($job);
         }
 
         parent::report($exception);
+    }
+
+    /**
+     * Convert an authentication exception into an unauthenticated response.
+     *
+     * @param $request
+     *
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     */
+    protected function unauthenticated($request)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['error' => 'Unauthenticated.'], 401);
+        }
+
+        return redirect()->guest('login');
     }
 }
